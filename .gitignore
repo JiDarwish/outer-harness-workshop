@@ -1,0 +1,28 @@
+# Author-only workshop material and completed lab backups
+/admin/
+
+# Maven and Java build output
+/bookshelf/target/
+*.class
+*.hprof
+*.log
+
+# Local JBang output
+/.jbang/
+
+# IDE files (the Maven project is defined by bookshelf/pom.xml)
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.factorypath
+out/
+
+# macOS and editor scratch files
+.DS_Store
+*.swp
+*.swo
