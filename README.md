@@ -1,103 +1,130 @@
-# Harness Engineering: build the loop around your coding agent
+# Harness engineering: build the outer loop around a coding agent
 
-This repository is the 95-minute solo workshop starter. Clone it, then work from
-the directory containing this README and `bookshelf/`. The Bookshelf is small:
-one `Book` is one physical copy, a `Member` borrows it, and a `Loan` records who holds
-it. There is no server or database. The existing tests pass, but the borrowing policy
-is not yet checked. That false green is where the exercise begins.
+This is a 95-minute solo workshop starter. Work from the directory containing this
+README and `bookshelf/`. The tiny Bookshelf has one physical copy of each book. Its
+existing tests pass, but the participant-owned borrowing policy test has no useful
+assertions yet. That false green starts the lab.
 
-The **inner harness** is Claude Code or Codex: it reads code and makes a change. The
-Java file [`harness/OuterHarness.java`](harness/OuterHarness.java) is your **outer
-harness**: it prepares the agent's input, calls it, runs a check independently, offers
-one repair attempt, and reports the result. You will implement those decisions in the
-loop. Expect about two dozen Java lines across the policy test and loop. The CLI
-adapters and process plumbing are supplied.
+The coding agent is the **inner harness**: it reads production Java and edits it.
+You will code the **outer harness** in [`harness/OuterHarness.java`](harness/OuterHarness.java):
+give the agent an agreed rule, run independent sensors after each attempt, send
+bounded repair feedback, and accept only fresh final evidence. The supplied
+[`Agent.java`](harness/Agent.java) and [`Checks.java`](harness/Checks.java) handle
+CLI calls, isolated source copies, Maven commands, timeouts, and concise logs.
 
-| | Ordinary computation | Model interpretation |
-|---|---|---|
-| Before the change (feedforward) | Your initial build prompt includes the approved policy. | The agent interprets that policy while editing. |
-| After the change (feedback) | JUnit and ArchUnit check declared properties. | A supplied advisory review raises semantic concerns. |
+| Theory | This lab's concrete action |
+|---|---|
+| Guide before action | Agree the borrowing rule with the librarian, then include `bookshelf/approved-policy.md` in the build and repair prompts. |
+| Sensor after action | Make `BorrowPolicyTest` effective; the outer loop invokes it after each successful agent attempt. |
+| Computational versus inferential | JUnit, static lint, and ArchUnit execute declared checks. Agreeing the business expectation and reviewing semantic modularity still need judgment. |
+| Independent properties | Behavior can pass while a dependency boundary fails. The outer loop records both, then checks the full suite only if focused sensors pass. |
+| Fresh acceptance | A repair can fix borrowing and introduce an architecture defect. Recheck everything on the repaired source. |
 
-Code can guarantee that a guide is delivered; it cannot guarantee how a model
-interprets it. A passing test proves its own expectation was met for the cases
-it ran, not that the expectation covers everything stakeholders meant.
+The borrowing example is deliberately small. At work, the business sensor might
+check pricing, permissions, time zones, or idempotency. An executable assertion
+checks conformance to one example; it does not prove the stakeholder chose the
+right rule or that the examples are complete.
 
 ## Before the session
 
-Have Java 25, JBang, Git, and either `claude` or `codex` installed and signed in. A
-Maven wrapper is included. From the repository root run:
+Install Java 25, JBang, and Git. A Maven wrapper is included. From the repository
+root run:
 
 ```bash
 bash preflight.sh
 ```
 
-The first run may download Maven, JUnit, ArchUnit, and JBang dependencies; do it before
-arriving. The no-op path and deterministic checks work without a coding-agent login.
-If your agent is unavailable during the session, follow the projected live run and
-still do the local check exercise.
+Do this before arriving so Maven, JUnit, ArchUnit, and JBang can download. The
+workshop's scripted controls need no model login. A live run at the end needs
+either `claude` or `codex` installed and signed in. Native-access or SLF4J
+warnings can appear even when Maven tests pass; use the test result and control
+labels as your checkpoint.
 
-## Solo exercise
+## Code the lab, one checkpoint at a time
 
-1. Run `(cd bookshelf && ./mvnw -B test)` from the repository root. It passes.
-   The tests are in the familiar `bookshelf/src/test/java` directory. Read
+1. **Notice the false green.** Run `(cd bookshelf && ./mvnw -B test)` from the
+   repository root. It passes. Open
    [`BorrowService.java`](bookshelf/src/main/java/workshop/bookshelf/service/BorrowService.java)
    and [`BorrowPolicyTest.java`](bookshelf/src/test/java/workshop/bookshelf/BorrowPolicyTest.java).
-   Why is the green test suite not evidence for a second borrow?
-2. Replace the questions in
-   [`bookshelf/approved-policy.md`](bookshelf/approved-policy.md) with the borrowing
-   outcome agreed with the librarian. Do not ask the coding agent to choose it for you.
-3. In `BorrowPolicyTest`, keep a reference to the shelf. Assert Bob's rejected
-   borrow result **and** that Alice remains the active borrower. After Alice returns
-   the book, assert that Bob can borrow it and becomes the active borrower. The
-   `shelf.activeLoan(1).memberId()` query makes the stored state visible. Run
-   `(cd bookshelf && ./mvnw -B -Dtest=BorrowPolicyTest test)` from the root;
-   the known-bad starter should fail. Run `bash controls.sh` from the root to
-   prove your test rejects the bad implementation and accepts the good one.
-   The script restores your production code afterward.
-4. In `harness/OuterHarness.java`, complete LAB 1 and LAB 2: put the approved
-   policy in `prompt`, then make `check(root)` call `Checks.run(root)`. Run
-   `jbang harness/OuterHarness.java --agent=noop`. This supplied test double
-   changes nothing. You should see your policy, one failed check, and
-   `status=UNRESOLVED repairs=0`; the command exits nonzero deliberately.
-5. Complete LAB 3 and LAB 4 in the same file. If the check failed and the latest
-   agent attempt succeeded, permit **one** repair. Send `finding.detail()` and
-   `finding.rerun()` in the repair prompt; record the new `agent.build(...)` result,
-   rerun `check(root)`, and show it. Accept only when the final finding is
-   `PASS` and no agent attempt failed. Rerun the no-op command. It should now
-   show two failing checks, one repair prompt, and
-   `status=UNRESOLVED repairs=1`.
-6. Run `jbang harness/OuterHarness.java --agent=claude` or use `--agent=codex`. The
-   agent receives your policy in its prompt and a temporary copy of production
-   sources. It cannot read or edit your tests. The
-   outer loop checks its result and may request one repair. The command stops an agent
-   call after three minutes and reports `UNRESOLVED` if the work is not accepted.
-   Compare accepted outcome, elapsed time, and available token counts; a faster or
-   cheaper run that misses the policy is not an equivalent success. Providers
-   account for cached input differently, so do not add the displayed categories
-   together without checking that CLI's usage semantics.
+   The tests live under the familiar `bookshelf/src/test/java` Maven layout.
+   Ask: what happens when Bob requests the copy Alice holds, and why did no test
+   catch it?
 
-If you get stuck, [`help/solution.md`](help/solution.md) contains the
-completed test and loop edits. You are done when the bad control fails, the good
-control passes, and your no-op loop makes one bounded repair attempt and reports
-`UNRESOLVED`. A live model repair does not have to converge.
+2. **Approve the rule before the agent acts.** Replace the questions in
+   [`bookshelf/approved-policy.md`](bookshelf/approved-policy.md) with the
+   librarian's agreed outcome. This is the feedforward guide. The agent should
+   implement the rule, not decide the rule for you.
 
-## Why the other sensor is supplied
+3. **Make that rule testable.** In `BorrowPolicyTest`, keep a shelf reference.
+   Assert Bob's result and the active borrower while Alice holds Book 1. After
+   Alice returns it, assert Bob can borrow and becomes the active borrower.
+   Run `(cd bookshelf && ./mvnw -B -Dtest=BorrowPolicyTest test)`; the starter
+   defect should fail. Then run `bash controls.sh` from the root. The checkpoint
+   is `BAD CONTROL: FAIL`, `GOOD CONTROL: PASS`, `CONTROL PAIR: PASS`. This bad/good
+   pair challenges your oracle. The script restores production code afterward.
 
-Run `bash architecture-control.sh` to see a separate failure: behavior tests still
-pass, but a domain class imports storage code and the supplied ArchUnit rule rejects
-it. Attendees do not need to code ArchUnit. It is a fast, deterministic check of a
-specific dependency direction; it does not know whether borrowing policy is right.
-The reverse is true of the borrowing test. An additional check may prevent rework, but
-can also increase total agent time or tokens when it triggers repair.
+4. **Wire the outer sensors.** Complete LAB 1 and LAB 2 in
+   `harness/OuterHarness.java`. Put the approved policy in the initial prompt.
+   In `checkSequence`, run `COMPILE` first. If it fails or errors, mark dependent
+   stages `SKIPPED`. On compilable code, run `STATIC_HYGIENE`,
+   `BUSINESS_BEHAVIOR`, and `ARCHITECTURE_BOUNDARY` independently; an ordinary
+   `FAIL` must not hide another focused result. Run `REGRESSION_SUITE` only if
+   all focused checks pass. Use `Checks.run(root, spec)` and
+   `Finding.skipped(spec, reason)`. Run:
 
-The facilitator will show a labelled advisory AI review and live repair examples.
-Treat them as discussion evidence, not results your own run must reproduce.
+   ```bash
+   jbang harness/OuterHarness.java --agent=noop
+   ```
 
-## Files worth opening
+   The no-op agent changes nothing. At this checkpoint, business behavior is
+   `FAIL`, architecture and static hygiene are `PASS`, the suite is `SKIPPED`,
+   and `status=UNRESOLVED repairs=0`. The command exits 1 on purpose. The
+   unedited starter reports `UNCHECKED`.
 
-- [`bookshelf/src/main/java`](bookshelf/src/main/java): the small production app.
-- [`bookshelf/src/test/java`](bookshelf/src/test/java): JUnit policy and architecture
-  tests. The coding agent receives only `bookshelf/src/main/java`.
-- [`harness/OuterHarness.java`](harness/OuterHarness.java): the loop you extend.
-- [`harness/Agent.java`](harness/Agent.java) and [`harness/Checks.java`](harness/Checks.java):
-  supplied CLI and subprocess plumbing. Read them later if you want the mechanics.
+5. **Bound repair and define acceptance.** Complete LAB 3, LAB 4, and LAB 5.
+   A successful agent attempt with application `FAIL` findings may get one
+   repair prompt containing **all** failing purposes, properties, short
+   diagnostics, and rerun commands. Agent failure or check `ERROR` stops the
+   loop. After repair, rerun the entire sequence. Accept only if every agent
+   attempt succeeded and every required named check on the final attempt is
+   `PASS`; show both attempts, skipped reasons, logs, timing, and available
+   usage. Rerun the no-op command: it should show two business failures and
+   `status=UNRESOLVED repairs=1`. Then run:
+
+   ```bash
+   bash harness-controls.sh
+   ```
+
+   It calibrates your borrowing test and runs scripted good, bad, combined,
+   regressing, lint, compile, agent-failure, and check-error cases in **disposable
+   copies**. It does not edit your working production sources. The checkpoint
+   is `HARNESS CONTROL PAIR: PASS`. Expect about a minute on a warm local
+   machine; inspect the labelled case and its output path if one fails.
+
+6. **Try a live agent if time permits.** After the deterministic checkpoints,
+   run `jbang harness/OuterHarness.java --agent=claude` or use `--agent=codex`.
+   The adapter gives it an isolated copy of production Java only. It cannot
+   read or edit your policy test. Each agent call has a three-minute timeout;
+   acceptance is still decided by your outer loop. Compare accepted outcome,
+   repair count, elapsed time, and available token categories. A missing token
+   value is `unavailable`, not zero; CLI providers may count cached input
+   differently, so do not add categories without checking their semantics.
+
+If stuck, use one matching section of the
+[checkpoint-based recovery guide](help/solution.md), then rerun that section's
+command before reading further. The coding checkpoint is
+the calibrated borrowing test plus a loop that rejects no-op and structural
+regression, accepts a scripted valid repair, and rejects agent/check failures.
+A live model does not have to converge for you to complete the workshop.
+
+The supplied ArchUnit rule checks one explicit dependency direction; it cannot
+judge every misplaced responsibility. The supplied static rule checks direct
+console writes in this library. A passing architecture or lint check does not
+certify the borrowing rule, and a passing borrowing test does not certify the
+requested structure. A short advisory semantic review can raise concerns that
+do not reduce cleanly to imports, with a human deciding what matters.
+
+Before leaving, name one recurring failure in your company repository. Write
+the guide you would give before an agent acts, the sensor you could run after,
+one known-bad and one valid control, the repair budget, the evidence you would
+measure, and the expectation that still needs human approval.

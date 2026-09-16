@@ -17,6 +17,11 @@ if ! (cd bookshelf && ./mvnw -q -B test) >"$preflight_log" 2>&1; then
     exit 1
 fi
 printf 'Bookshelf baseline tests: green\n'
+if ! java harness/StaticHygiene.java bookshelf/src/main/java >"$preflight_log" 2>&1; then
+    tail -20 "$preflight_log"
+    exit 1
+fi
+printf 'Static hygiene sensor: ok\n'
 if ! jbang build harness/OuterHarness.java >"$preflight_log" 2>&1; then
     tail -20 "$preflight_log"
     exit 1

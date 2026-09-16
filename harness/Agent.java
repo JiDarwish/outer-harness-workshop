@@ -28,9 +28,91 @@ final class Agents {
                 IO.println("\n[NOOP agent received]\n" + prompt);
                 return new AgentResult("no-op test double", false, 0, null, null, null);
             };
+            case "good-first", "fix-on-repair", "structure-bad", "combined-fixed",
+                 "regress-structure", "lint-bad", "compile-fixed", "agent-fail",
+                 "repair-fail" -> new ScriptedAgent(mode, productionSources);
             case "claude", "codex" -> new CliAgent(mode, productionSources);
-            default -> throw new IllegalArgumentException("Use --agent=noop, --agent=claude or --agent=codex");
+            default -> throw new IllegalArgumentException("Unknown agent mode: " + mode);
         };
+    }
+}
+
+/** Prepared controls change production sources only; prompts and token counts stay visible. */
+final class ScriptedAgent implements Agent {
+    private final String mode;
+    private final Path productionSources;
+    private final Path fixtures;
+    private int calls;
+
+    ScriptedAgent(String mode, Path productionSources) {
+        this.mode = mode;
+        this.productionSources = productionSources;
+        this.fixtures = productionSources.getParent().getParent().getParent().getParent()
+                .resolve("fixtures");
+    }
+
+    @Override public AgentResult build(String prompt) {
+        var started = System.nanoTime();
+        calls++;
+        IO.println("\n[SCRIPTED " + mode + " attempt=" + calls + " received]\n" + prompt);
+        if (mode.equals("agent-fail") || (mode.equals("repair-fail") && calls > 1)) {
+            return new AgentResult("scripted agent failure", true, elapsed(started),
+                    null, null, null);
+        }
+        try {
+            switch (mode) {
+                case "good-first", "fix-on-repair" -> {
+                    service(mode.equals("good-first") || calls > 1 ? "good" : "bad");
+                    book("architecture-good");
+                }
+                case "structure-bad" -> {
+                    service("good");
+                    book("architecture-bad");
+                }
+                case "combined-fixed" -> {
+                    service(calls > 1 ? "good" : "bad");
+                    book(calls > 1 ? "architecture-good" : "architecture-bad");
+                }
+                case "regress-structure" -> {
+                    service(calls > 1 ? "good" : "bad");
+                    book(calls > 1 ? "architecture-bad" : "architecture-good");
+                }
+                case "lint-bad" -> {
+                    service("console-bad");
+                    book("architecture-good");
+                }
+                case "compile-fixed" -> {
+                    service(calls > 1 ? "good" : "compile-bad");
+                    book("architecture-good");
+                }
+                case "repair-fail" -> {
+                    service("bad");
+                    book("architecture-good");
+                }
+                default -> throw new IllegalArgumentException("Unsupported scripted mode: " + mode);
+            }
+            return new AgentResult("scripted " + mode + " attempt " + calls, false,
+                    elapsed(started), null, null, null);
+        } catch (IOException e) {
+            return new AgentResult("scripted fixture failed: " + e.getMessage(), true,
+                    elapsed(started), null, null, null);
+        }
+    }
+
+    private void service(String fixture) throws IOException {
+        Files.copy(fixtures.resolve(fixture + "/BorrowService.java"),
+                productionSources.resolve("workshop/bookshelf/service/BorrowService.java"),
+                StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private void book(String fixture) throws IOException {
+        Files.copy(fixtures.resolve(fixture + "/Book.java"),
+                productionSources.resolve("workshop/bookshelf/domain/Book.java"),
+                StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static long elapsed(long started) {
+        return (System.nanoTime() - started) / 1_000_000;
     }
 }
 
