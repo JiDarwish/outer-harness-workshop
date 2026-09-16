@@ -30,7 +30,7 @@ Work in:
 bookshelf/src/test/java/workshop/bookshelf/BorrowPolicyTest.java
 ```
 
-First add the missing outcome import and static assertion import near the top:
+The starter already imports the outcome and assertion you need:
 
 ```java
 import workshop.bookshelf.domain.BorrowOutcome;
@@ -38,24 +38,19 @@ import workshop.bookshelf.domain.BorrowOutcome;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 ```
 
-Inside the test method, create the shelf separately so you can inspect its
-active loan:
+It also gives you `shelf`, `service`, and `aliceId`. Replace the unasserted first
+borrow and the workshop comments with this sequence:
 
 ```java
-var shelf = BorrowServiceTest.shelf();
-var service = new BorrowService(shelf);
-```
+var bobId = 11;
 
-Then express the example as a sequence of observations:
-
-```java
-assertEquals(BorrowOutcome.BORROWED, service.borrow(1, 10));
-assertEquals(BorrowOutcome.BOOK_UNAVAILABLE, service.borrow(1, 11));
-assertEquals(10L, shelf.activeLoan(1).memberId());
+assertEquals(BorrowOutcome.BORROWED, service.borrow(1, aliceId));
+assertEquals(BorrowOutcome.BOOK_UNAVAILABLE, service.borrow(1, bobId));
+assertEquals((long) aliceId, shelf.activeLoan(1).memberId());
 
 assertEquals(BorrowOutcome.RETURNED, service.returnBook(1));
-assertEquals(BorrowOutcome.BORROWED, service.borrow(1, 11));
-assertEquals(11L, shelf.activeLoan(1).memberId());
+assertEquals(BorrowOutcome.BORROWED, service.borrow(1, bobId));
+assertEquals((long) bobId, shelf.activeLoan(1).memberId());
 ```
 
 Run the focused sensor:
@@ -108,7 +103,7 @@ can describe that attempt:
 ```java
 var findings = new ArrayList<Finding>();
 if (agent.failed()) {
-    for (var spec : required()) {
+    for (var spec : requiredChecks()) {
         findings.add(Finding.skipped(spec, "Agent attempt failed"));
     }
     return findings;
@@ -124,46 +119,61 @@ Run `COMPILE`, keep its result, and make every dependent stage explicitly
 var compile = Checks.run(root, Checks.COMPILE);
 findings.add(compile);
 if (!compile.passed()) {
-    for (var spec : required().subList(1, required().size())) {
-        findings.add(Finding.skipped(spec, "Compilation did not pass"));
+    var reason = "Compilation did not pass";
+    var checksBlockedByCompilation = List.of(
+            Checks.STATIC_HYGIENE,
+            Checks.BUSINESS_BEHAVIOR,
+            Checks.ARCHITECTURE_BOUNDARY,
+            Checks.FULL_TEST_SUITE);
+    for (var check : checksBlockedByCompilation) {
+        findings.add(Finding.skipped(check, reason));
     }
     return findings;
 }
 ```
 
-A compile `FAIL` may be repairable application evidence. A compile `ERROR`
-still prevents dependent checks. `needsRepair` will distinguish those states.
+The named list makes the dependency visible without four repeated statements or
+a list index to decode. A compile `FAIL` may be repairable application evidence.
+A compile `ERROR` still prevents dependent checks. `needsRepair` will distinguish
+those states.
 
 ### 4.3 Collect independent focused findings
 
-Once the source compiles, run lint, business behaviour, and architecture. An
-ordinary `FAIL` should not hide another useful finding. An infrastructure
-`ERROR` stops later commands because the evidence chain is no longer reliable:
+Once the source compiles, run lint, business behaviour, and architecture. These
+sensors are independent, so a `FAIL` or `ERROR` from one does not hide the
+others:
 
 ```java
 for (var spec : List.of(
         Checks.STATIC_HYGIENE,
         Checks.BUSINESS_BEHAVIOR,
         Checks.ARCHITECTURE_BOUNDARY)) {
-    if (findings.stream().anyMatch(Finding::error)) {
-        findings.add(Finding.skipped(
-                spec, "Earlier check had an infrastructure error"));
-    } else {
-        findings.add(Checks.run(root, spec));
-    }
+    findings.add(Checks.run(root, spec));
 }
 ```
 
-### 4.4 Gate the full regression suite
+An `ERROR` still prevents repair and acceptance later. It does not prevent an
+independent sensor from producing its own evidence.
 
-Run the complete suite only when every earlier stage passed:
+### 4.4 Gate the full test suite
+
+The full test suite is the broad regression check: it verifies that existing
+Bookshelf behaviour still works after the focused properties pass. Decide
+whether every finding collected so far passed without a stream expression:
 
 ```java
-if (findings.stream().allMatch(Finding::passed)) {
-    findings.add(Checks.run(root, Checks.REGRESSION_SUITE));
+var allFocusedChecksPassed = true;
+for (var finding : findings) {
+    if (!finding.passed()) {
+        allFocusedChecksPassed = false;
+    }
+}
+
+if (allFocusedChecksPassed) {
+    findings.add(Checks.run(root, Checks.FULL_TEST_SUITE));
 } else {
     findings.add(Finding.skipped(
-            Checks.REGRESSION_SUITE,
+            Checks.FULL_TEST_SUITE,
             "A focused check did not pass"));
 }
 return findings;
@@ -182,7 +192,7 @@ COMPILE                 PASS
 STATIC_HYGIENE          PASS
 BUSINESS_BEHAVIOR       FAIL
 ARCHITECTURE_BOUNDARY   PASS
-REGRESSION_SUITE        SKIPPED
+FULL_TEST_SUITE         SKIPPED
 status=UNRESOLVED repairs=0
 ```
 
@@ -195,10 +205,20 @@ result.
 application `FAIL`, and no `ERROR` or `UNCHECKED` finding:
 
 ```java
-return !report.agent().failed()
-        && report.findings().stream().anyMatch(Finding::failed)
-        && report.findings().stream()
-                .noneMatch(finding -> finding.error() || finding.unchecked());
+if (report.agent().failed()) {
+    return false;
+}
+
+var foundApplicationFailure = false;
+for (var finding : report.findings()) {
+    if (finding.error() || finding.unchecked()) {
+        return false;
+    }
+    if (finding.failed()) {
+        foundApplicationFailure = true;
+    }
+}
+return foundApplicationFailure;
 ```
 
 The surrounding main method already limits the loop to one repair. Do not
@@ -236,26 +256,21 @@ business and architecture findings in one bounded repair request.
 
 ## 7. LAB 4: stale results are being accepted
 
-Acceptance must inspect the final attempt as a complete ordered set. First
-reject any run containing a failed agent call:
+Acceptance must inspect the final attempt only. Old passes belong to old source
+snapshots and cannot approve repaired code:
 
 ```java
-if (reports.stream().anyMatch(report -> report.agent().failed())) {
+var finalAttempt = reports.getLast();
+if (finalAttempt.agent().failed()) {
     return false;
 }
-```
 
-Then compare the final findings with `required()`:
+if (finalAttempt.findings().size() != requiredChecks().size()) {
+    return false;
+}
 
-```java
-var finalFindings = reports.getLast().findings();
-var specs = required();
-if (finalFindings.size() != specs.size()) return false;
-
-for (var index = 0; index < specs.size(); index++) {
-    var finding = finalFindings.get(index);
-    var spec = specs.get(index);
-    if (!finding.name().equals(spec.name()) || !finding.passed()) {
+for (var finding : finalAttempt.findings()) {
+    if (!finding.passed()) {
         return false;
     }
 }
@@ -265,7 +280,13 @@ return true;
 This prevents an architecture `PASS` from the build attempt from approving a
 repair attempt that introduced a structural violation.
 
-## 8. LAB 5: the report hides the useful failure
+Reporting is supplied in the starter so the coding time stays focused on the
+outer-loop decisions. Read the output as evidence: it shows attempts, check
+states, skipped reasons, diagnostics, log paths, timing, and available usage.
+
+<!-- OPTIONAL LAB 5 — preserved for a later workshop decision.
+
+## 8. LAB 5: report the evidence
 
 The first line in `show` already reports the attempt and agent usage. Inside
 the findings loop, print the check identity first:
@@ -294,7 +315,9 @@ if (finding.logPath() != null && (finding.failed() || finding.error())) {
 The concise diagnostic belongs in the terminal and repair prompt. The full log
 path remains available for a person who needs to investigate.
 
-## 9. Final deterministic checkpoint
+End optional LAB 5. -->
+
+## 8. Final deterministic checkpoint
 
 Run the no-op once more:
 
@@ -308,26 +331,28 @@ It should make one repair attempt, reject the unchanged defect, and finish:
 status=UNRESOLVED repairs=1
 ```
 
-Then run the complete harness controls:
+Then run the deterministic harness verification suite:
 
 ```bash
-bash harness-controls.sh
+bash verify-harness.sh
 ```
 
 The final checkpoint is:
 
 ```text
-HARNESS CONTROL PAIR: PASS
+HARNESS CONTROL SUITE: PASS
 ```
 
-The script uses disposable copies and deterministic agent fixtures. If a case
-fails, read its labelled name and output path before changing the loop. Its
-structure cases demonstrate that behaviour can pass while architecture fails,
-including a repair that introduces a new dependency violation.
+This is the test suite for your outer harness. It uses disposable copies and
+deterministic agent fixtures, not a live model. If a case fails, read its
+labelled name and output path before changing the loop. Its structure cases
+demonstrate that behaviour can pass while architecture fails, including a
+repair that introduces a new dependency violation.
 
-## 10. A live model behaves differently
+## 9. A live model behaves differently
 
 A live agent may fix the defect on its first build, need the repair call, time
 out, or fail. None of those outcomes changes the acceptance contract. Run a
 live agent only after the deterministic controls pass, and record the prompt,
 agent, date, elapsed time, repair count, accepted outcome, and available usage.
+The Claude adapter is pinned to `sonnet` for both attempts.

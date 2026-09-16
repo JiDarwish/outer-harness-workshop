@@ -173,6 +173,7 @@ final class CliAgent implements Agent {
     private List<String> command(Path isolated, String prompt) {
         if (mode.equals("claude")) {
             return List.of("claude", "-p", prompt, "--output-format", "json",
+                    "--model", "sonnet",
                     "--restricted", "--permission-mode", "acceptEdits",
                     "--tools", "Read,Write,Edit,Glob,Grep");
         }

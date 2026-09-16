@@ -49,8 +49,8 @@ final class Checks {
     static final CheckSpec ARCHITECTURE_BOUNDARY = new CheckSpec("ARCHITECTURE_BOUNDARY",
             "domain classes do not depend on service or storage",
             List.of("./mvnw", "-q", "-B", "-Dtest=ArchitectureTest", "test"));
-    static final CheckSpec REGRESSION_SUITE = new CheckSpec("REGRESSION_SUITE",
-            "the complete Bookshelf test suite",
+    static final CheckSpec FULL_TEST_SUITE = new CheckSpec("FULL_TEST_SUITE",
+            "all existing Bookshelf tests still pass",
             List.of("./mvnw", "-q", "-B", "test"));
 
     private Checks() { }

@@ -55,9 +55,10 @@ labels as your checkpoint.
    librarian's agreed outcome. This is the feedforward guide. The agent should
    implement the rule, not decide the rule for you.
 
-3. **Make that rule testable.** In `BorrowPolicyTest`, keep a shelf reference.
-   Assert Bob's result and the active borrower while Alice holds Book 1. After
-   Alice returns it, assert Bob can borrow and becomes the active borrower.
+3. **Make that rule testable.** `BorrowPolicyTest` already gives you the shelf,
+   service, and Alice's ID. Turn the first borrow into an assertion, then assert
+   Bob's result and the active borrower while Alice holds Book 1. After Alice
+   returns it, assert Bob can borrow and becomes the active borrower.
    Run `(cd bookshelf && ./mvnw -B -Dtest=BorrowPolicyTest test)`; the starter
    defect should fail. Then run `bash controls.sh` from the root. The checkpoint
    is `BAD CONTROL: FAIL`, `GOOD CONTROL: PASS`, `CONTROL PAIR: PASS`. This bad/good
@@ -68,8 +69,10 @@ labels as your checkpoint.
    In `checkSequence`, run `COMPILE` first. If it fails or errors, mark dependent
    stages `SKIPPED`. On compilable code, run `STATIC_HYGIENE`,
    `BUSINESS_BEHAVIOR`, and `ARCHITECTURE_BOUNDARY` independently; an ordinary
-   `FAIL` must not hide another focused result. Run `REGRESSION_SUITE` only if
-   all focused checks pass. Use `Checks.run(root, spec)` and
+   `FAIL` or `ERROR` must not hide another independent focused result. Run
+   `FULL_TEST_SUITE` only if all focused checks pass. This final command runs
+   every existing Bookshelf test as a broad regression check. Use
+   `Checks.run(root, spec)` and
    `Finding.skipped(spec, reason)`. Run:
 
    ```bash
@@ -81,30 +84,36 @@ labels as your checkpoint.
    and `status=UNRESOLVED repairs=0`. The command exits 1 on purpose. The
    unedited starter reports `UNCHECKED`.
 
-5. **Bound repair and define acceptance.** Complete LAB 3, LAB 4, and LAB 5.
+5. **Bound repair and define acceptance.** Complete LAB 3 and LAB 4. Reporting
+   is supplied so you can focus on the outer-loop decisions.
    A successful agent attempt with application `FAIL` findings may get one
    repair prompt containing **all** failing purposes, properties, short
-   diagnostics, and rerun commands. Agent failure or check `ERROR` stops the
-   loop. After repair, rerun the entire sequence. Accept only if every agent
-   attempt succeeded and every required named check on the final attempt is
-   `PASS`; show both attempts, skipped reasons, logs, timing, and available
-   usage. Rerun the no-op command: it should show two business failures and
+   diagnostics, and rerun commands. Agent failure or check `ERROR` prevents an
+   application repair. After repair, rerun the entire sequence. Accept only if
+   the final attempt succeeded and contains a complete set of `PASS` findings.
+   The supplied report shows both attempts, skipped reasons, logs, timing, and
+   available usage. Rerun the no-op command: it should show two business failures and
    `status=UNRESOLVED repairs=1`. Then run:
 
    ```bash
-   bash harness-controls.sh
+   bash verify-harness.sh
    ```
 
-   It calibrates your borrowing test and runs scripted good, bad, combined,
+   This is the deterministic test suite for your outer harness. It calibrates
+   your borrowing test and runs scripted good, bad, combined,
    regressing, lint, compile, agent-failure, and check-error cases in **disposable
    copies**. It does not edit your working production sources. The checkpoint
-   is `HARNESS CONTROL PAIR: PASS`. Expect about a minute on a warm local
+   is `HARNESS CONTROL SUITE: PASS`. It uses no live model. Expect about a minute on a warm local
    machine; inspect the labelled case and its output path if one fails.
 
 6. **Try a live agent if time permits.** After the deterministic checkpoints,
    run `jbang harness/OuterHarness.java --agent=claude` or use `--agent=codex`.
-   The adapter gives it an isolated copy of production Java only. It cannot
-   read or edit your policy test. Each agent call has a three-minute timeout;
+   The Claude adapter is pinned to `sonnet`. The adapter gives the live agent an
+   isolated copy of production Java only; it cannot read or edit your protected
+   policy test. That boundary preserves an independent acceptance sensor for
+   this experiment. In a real repository, an agent may also write development
+   tests while protected acceptance checks and CI policy remain outside its
+   control. Each agent call has a three-minute timeout;
    acceptance is still decided by your outer loop. Compare accepted outcome,
    repair count, elapsed time, and available token categories. A missing token
    value is `unavailable`, not zero; CLI providers may count cached input

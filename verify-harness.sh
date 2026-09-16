@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Run the participant's outer loop against prepared agent outcomes in disposable copies.
+# Deterministically test the participant's outer loop in disposable copies.
 set -u
 cd "$(dirname "$0")"
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/bookshelf-harness-controls.XXXXXX")
+printf 'Verifying the outer harness with scripted agents in disposable copies.\n'
+printf 'No live model is used and the working production sources are not changed.\n'
+
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/bookshelf-verify-harness.XXXXXX")
 cp -R bookshelf "$scratch/bookshelf"
 cp -R harness "$scratch/harness"
 cp -R fixtures "$scratch/fixtures"
@@ -13,7 +16,7 @@ cp controls.sh "$scratch/controls.sh"
 # stakeholder's rule, but it can reject the untouched starter text.
 if grep -Fq "Write the outcome agreed with the librarian here" \
         "$scratch/bookshelf/approved-policy.md"; then
-    printf 'HARNESS CONTROLS: STOP — replace the approved-policy placeholder first\n'
+    printf 'HARNESS VERIFICATION: STOP — replace the approved-policy placeholder first\n'
     printf 'Disposable files: %s\n' "$scratch"
     exit 1
 fi
@@ -21,13 +24,15 @@ fi
 # The loop cannot certify a false-green business oracle. Calibrate it first.
 if ! (cd "$scratch" && bash controls.sh) >"$scratch/oracle.log" 2>&1; then
     cat "$scratch/oracle.log"
-    printf 'HARNESS CONTROLS: STOP — finish and calibrate BorrowPolicyTest first\n'
+    printf 'HARNESS VERIFICATION: STOP — finish and calibrate BorrowPolicyTest first\n'
     printf 'Disposable files: %s\n' "$scratch"
     exit 1
 fi
 cat "$scratch/oracle.log"
 
 failures=0
+case_number=0
+case_total=11
 
 expect() {
     if ! grep -Fq "$2" "$1"; then
@@ -39,6 +44,8 @@ expect() {
 run_case() {
     local mode="$1" expected_status="$2" expected_repairs="$3" expected_exit="$4"
     local case_root log exit_code ok
+    case_number=$((case_number + 1))
+    printf '[%s/%s] %s\n' "$case_number" "$case_total" "$mode"
     case_root=$(mktemp -d "$scratch/$mode.XXXXXX")
     cp -R "$scratch/bookshelf" "$case_root/bookshelf"
     cp -R "$scratch/harness" "$case_root/harness"
@@ -58,7 +65,7 @@ run_case() {
     expect "$log" "status=$expected_status repairs=$expected_repairs" || ok=0
     case "$1" in
         good-first)
-            for stage in COMPILE STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY REGRESSION_SUITE; do
+            for stage in COMPILE STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY FULL_TEST_SUITE; do
                 expect "$log" "check=$stage state=PASS attempt=build" || ok=0
             done
             local build_prompt
@@ -71,27 +78,27 @@ run_case() {
         noop)
             expect "$log" "check=BUSINESS_BEHAVIOR state=FAIL attempt=build" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=PASS attempt=build" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=build" || ok=0
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=build" || ok=0
             expect "$log" "check=BUSINESS_BEHAVIOR state=FAIL attempt=repair" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=PASS attempt=repair" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=repair" || ok=0
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=repair" || ok=0
             ;;
         fix-on-repair)
             expect "$log" "check=BUSINESS_BEHAVIOR state=FAIL attempt=build" || ok=0
-            for stage in COMPILE STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY REGRESSION_SUITE; do
+            for stage in COMPILE STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY FULL_TEST_SUITE; do
                 expect "$log" "check=$stage state=PASS attempt=repair" || ok=0
             done
             ;;
         structure-bad)
             expect "$log" "check=BUSINESS_BEHAVIOR state=PASS attempt=build" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=FAIL attempt=build" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=repair" || ok=0
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=repair" || ok=0
             ;;
         combined-fixed)
             expect "$log" "check=BUSINESS_BEHAVIOR state=FAIL attempt=build" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=FAIL attempt=build" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=build" || ok=0
-            for stage in BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY REGRESSION_SUITE; do
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=build" || ok=0
+            for stage in BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY FULL_TEST_SUITE; do
                 expect "$log" "check=$stage state=PASS attempt=repair" || ok=0
             done
             local prompt
@@ -106,17 +113,17 @@ run_case() {
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=PASS attempt=build" || ok=0
             expect "$log" "check=BUSINESS_BEHAVIOR state=PASS attempt=repair" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=FAIL attempt=repair" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=repair" || ok=0
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=repair" || ok=0
             ;;
         lint-bad)
             expect "$log" "check=STATIC_HYGIENE state=FAIL attempt=build" || ok=0
             expect "$log" "check=BUSINESS_BEHAVIOR state=PASS attempt=build" || ok=0
             expect "$log" "check=ARCHITECTURE_BOUNDARY state=PASS attempt=build" || ok=0
-            expect "$log" "check=REGRESSION_SUITE state=SKIPPED attempt=repair" || ok=0
+            expect "$log" "check=FULL_TEST_SUITE state=SKIPPED attempt=repair" || ok=0
             ;;
         compile-fixed)
             expect "$log" "check=COMPILE state=FAIL attempt=build" || ok=0
-            for stage in STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY REGRESSION_SUITE; do
+            for stage in STATIC_HYGIENE BUSINESS_BEHAVIOR ARCHITECTURE_BOUNDARY FULL_TEST_SUITE; do
                 expect "$log" "check=$stage state=SKIPPED attempt=build" || ok=0
                 expect "$log" "check=$stage state=PASS attempt=repair" || ok=0
             done
@@ -140,9 +147,9 @@ run_case() {
             ;;
     esac
     if [ "$ok" -eq 1 ]; then
-        printf '%s CONTROL: PASS\n' "$1"
+        printf '  PASS\n'
     else
-        printf '%s CONTROL: FAIL — output in %s\n' "$1" "$log"
+        printf '  FAIL — output in %s\n' "$log"
         failures=$((failures + 1))
     fi
 }
@@ -160,9 +167,9 @@ run_case repair-fail UNRESOLVED 1 1
 run_case check-error UNRESOLVED 0 1
 
 if [ "$failures" -eq 0 ]; then
-    printf 'HARNESS CONTROL PAIR: PASS\n'
+    printf 'HARNESS CONTROL SUITE: PASS\n'
 else
-    printf 'HARNESS CONTROL PAIR: FAIL (%s cases)\n' "$failures"
+    printf 'HARNESS CONTROL SUITE: FAIL (%s cases)\n' "$failures"
     printf 'Disposable files: %s\n' "$scratch"
     exit 1
 fi

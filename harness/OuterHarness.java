@@ -45,25 +45,25 @@ void main(String[] args) throws Exception {
 }
 
 /** The declared order also defines the exact final acceptance gate. */
-List<CheckSpec> required() {
+List<CheckSpec> requiredChecks() {
     return List.of(Checks.COMPILE, Checks.STATIC_HYGIENE, Checks.BUSINESS_BEHAVIOR,
-            Checks.ARCHITECTURE_BOUNDARY, Checks.REGRESSION_SUITE);
+            Checks.ARCHITECTURE_BOUNDARY, Checks.FULL_TEST_SUITE);
 }
 
 List<Finding> checkSequence(Path root, AgentResult agent) {
-    // LAB 2 — sensors after every successful attempt:
-    // 1. If agent failed, return SKIPPED for every required check.
+    // LAB 2 — record an outcome after every agent invocation:
+    // 1. If the invocation produced no candidate, SKIP every required check.
     // 2. Run COMPILE. On FAIL/ERROR, SKIP dependent checks and return.
-    // 3. Run STATIC_HYGIENE, BUSINESS_BEHAVIOR, ARCHITECTURE_BOUNDARY independently.
-    //    Ordinary FAIL does not hide a later focused check; ERROR stops it.
-    // 4. Run REGRESSION_SUITE only if every earlier check passed; otherwise SKIP it.
+    // 3. Run STATIC_HYGIENE, BUSINESS_BEHAVIOR, and ARCHITECTURE_BOUNDARY.
+    //    They are independent: one non-PASS result does not hide the others.
+    // 4. Run FULL_TEST_SUITE only if compilation and all focused checks passed.
     // Use Checks.run(root, spec) and Finding.skipped(spec, reason).
     return List.of(Finding.notWired());
 }
 
 boolean needsRepair(AttemptReport report) {
-    // LAB 3 — require a successful agent attempt and at least one repairable FAIL.
-    // ERROR and UNCHECKED are stopping evidence, never reasons to repair the app.
+    // LAB 3 — repair application FAIL findings only. Agent failure, ERROR, and
+    // UNCHECKED mean there is no trustworthy application repair to request.
     return false;
 }
 
@@ -74,11 +74,16 @@ String repairPrompt(String task, String policy, AttemptReport report) {
 }
 
 boolean accepted(List<AttemptReport> reports) {
-    // LAB 4 — all agent attempts succeeded and the FINAL attempt has each
-    // required named check in order, with PASS. Old PASS results cannot be reused.
+    // LAB 4 — inspect the FINAL attempt only. It must come from a successful
+    // agent call and contain a complete set of PASS findings. Never reuse old PASS results.
     return false;
 }
 
+/*
+ * OPTIONAL LAB 5 (currently supplied): participants could implement this report
+ * to expose attempt identity, timings, usage, diagnostics, skipped reasons, and
+ * log paths. Keep supplied unless we decide reporting deserves workshop time.
+ */
 void show(AttemptReport report) {
     IO.println("attempt=" + report.label() + " agent=" + report.agent().summary()
             + " elapsed_ms=" + report.agent().elapsedMs()
@@ -88,6 +93,14 @@ void show(AttemptReport report) {
     for (var finding : report.findings()) {
         IO.println("check=" + finding.name() + " state=" + finding.state()
                 + " attempt=" + report.label() + " elapsed_ms=" + finding.elapsedMs());
-        // LAB 5 — show FAIL/ERROR details, SKIPPED reasons, and full log path.
+        if (finding.failed() || finding.error()) {
+            IO.println(finding.detail());
+        }
+        if (finding.state() == Finding.State.SKIPPED) {
+            IO.println("reason=" + finding.detail());
+        }
+        if (finding.logPath() != null && (finding.failed() || finding.error())) {
+            IO.println("full_log=" + finding.logPath());
+        }
     }
 }
