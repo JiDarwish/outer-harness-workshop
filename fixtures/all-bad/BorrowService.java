@@ -4,7 +4,7 @@ import workshop.bookshelf.domain.BorrowOutcome;
 import workshop.bookshelf.domain.Loan;
 import workshop.bookshelf.storage.InMemoryBookshelf;
 
-/** Compiles and borrows correctly, but leaks an ad hoc console side effect. */
+/** Deliberately violates static hygiene and the approved borrowing policy. */
 public final class BorrowService {
     private final InMemoryBookshelf shelf;
 
@@ -16,7 +16,6 @@ public final class BorrowService {
         System.out.println("borrowing book " + bookId);
         if (!shelf.hasBook(bookId)) return BorrowOutcome.BOOK_NOT_FOUND;
         if (!shelf.hasMember(memberId)) return BorrowOutcome.MEMBER_NOT_FOUND;
-        if (shelf.activeLoan(bookId) != null) return BorrowOutcome.BOOK_UNAVAILABLE;
 
         shelf.record(new Loan(bookId, memberId));
         return BorrowOutcome.BORROWED;

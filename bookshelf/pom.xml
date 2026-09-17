@@ -25,6 +25,13 @@
             <version>1.4.1</version>
             <scope>test</scope>
         </dependency>
+        <!-- ArchUnit uses SLF4J; keep its setup warning out of participant output. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>2.0.17</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

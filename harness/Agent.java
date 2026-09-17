@@ -24,13 +24,11 @@ final class Agents {
 
     static Agent create(String mode, Path productionSources) {
         return switch (mode) {
-            case "noop" -> prompt -> {
-                IO.println("\n[NOOP agent received]\n" + prompt);
-                return new AgentResult("no-op test double", false, 0, null, null, null);
-            };
-            case "good-first", "fix-on-repair", "structure-bad", "combined-fixed",
-                 "regress-structure", "lint-bad", "compile-fixed", "agent-fail",
-                 "repair-fail" -> new ScriptedAgent(mode, productionSources);
+            case "check-only" -> prompt -> new AgentResult(
+                    "no agent; checked existing source", false, 0, null, null, null);
+            // These compact scenarios are used only by verify-harness.sh.
+            case "valid-first", "demo", "compile-gate", "repair-regression",
+                 "agent-failure" -> new ScriptedAgent(mode, productionSources);
             case "claude", "codex" -> new CliAgent(mode, productionSources);
             default -> throw new IllegalArgumentException("Unknown agent mode: " + mode);
         };
@@ -55,38 +53,30 @@ final class ScriptedAgent implements Agent {
         var started = System.nanoTime();
         calls++;
         IO.println("\n[SCRIPTED " + mode + " attempt=" + calls + " received]\n" + prompt);
-        if (mode.equals("agent-fail") || (mode.equals("repair-fail") && calls > 1)) {
+        if (mode.equals("agent-failure")) {
             return new AgentResult("scripted agent failure", true, elapsed(started),
                     null, null, null);
         }
         try {
             switch (mode) {
-                case "good-first", "fix-on-repair" -> {
-                    service(mode.equals("good-first") || calls > 1 ? "good" : "bad");
+                case "valid-first" -> {
+                    service("good");
                     book("architecture-good");
                 }
-                case "structure-bad" -> {
-                    service("good");
-                    book("architecture-bad");
-                }
-                case "combined-fixed" -> {
-                    service(calls > 1 ? "good" : "bad");
+                case "demo" -> {
+                    IO.println(calls == 1
+                            ? "[PREPARED EDIT] BorrowService gets console output and the known "
+                                    + "borrowing defect; Book gets a domain-to-storage dependency."
+                            : "[PREPARED EDIT] BorrowService and Book are replaced with the valid controls.");
+                    service(calls > 1 ? "good" : "all-bad");
                     book(calls > 1 ? "architecture-good" : "architecture-bad");
                 }
-                case "regress-structure" -> {
+                case "repair-regression" -> {
                     service(calls > 1 ? "good" : "bad");
                     book(calls > 1 ? "architecture-bad" : "architecture-good");
                 }
-                case "lint-bad" -> {
-                    service("console-bad");
-                    book("architecture-good");
-                }
-                case "compile-fixed" -> {
+                case "compile-gate" -> {
                     service(calls > 1 ? "good" : "compile-bad");
-                    book("architecture-good");
-                }
-                case "repair-fail" -> {
-                    service("bad");
                     book("architecture-good");
                 }
                 default -> throw new IllegalArgumentException("Unsupported scripted mode: " + mode);
@@ -134,6 +124,8 @@ final class CliAgent implements Agent {
     public AgentResult build(String prompt) {
         var started = System.nanoTime();
         try {
+            IO.println("Starting " + mode
+                    + " in an isolated production-source copy (timeout: 180 seconds)...");
             var isolated = Files.createTempDirectory("bookshelf-agent-");
             var isolatedSources = isolated.resolve("src");
             copyJava(productionSources, isolatedSources);
@@ -173,12 +165,15 @@ final class CliAgent implements Agent {
     private List<String> command(Path isolated, String prompt) {
         if (mode.equals("claude")) {
             return List.of("claude", "-p", prompt, "--output-format", "json",
-                    "--model", "sonnet",
+                    "--model", "haiku",
+                    "--no-session-persistence",
                     "--restricted", "--permission-mode", "acceptEdits",
                     "--tools", "Read,Write,Edit,Glob,Grep");
         }
-        var command = new ArrayList<>(List.of("codex", "exec", "--json", "--sandbox",
-                "workspace-write", "--skip-git-repo-check", "--ephemeral", "-C", isolated.toString()));
+        var command = new ArrayList<>(List.of("codex", "exec", "--json",
+                "--model", "gpt-5.5", "--sandbox", "workspace-write",
+                "--skip-git-repo-check", "--ephemeral", "--ignore-rules",
+                "-C", isolated.toString()));
         command.add(prompt);
         return command;
     }

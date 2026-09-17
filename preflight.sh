@@ -12,6 +12,7 @@ command -v jbang >/dev/null || { printf 'JBang missing\n'; exit 1; }
 printf 'Git and JBang: ok\n'
 
 preflight_log=$(mktemp)
+trap 'rm -f "$preflight_log"' EXIT
 if ! (cd bookshelf && ./mvnw -q -B test) >"$preflight_log" 2>&1; then
     tail -20 "$preflight_log"
     exit 1
@@ -31,5 +32,5 @@ printf 'Outer harness compilation: ok\n'
 if command -v claude >/dev/null || command -v codex >/dev/null; then
     printf 'Coding agent CLI found; make sure you are signed in\n'
 else
-    printf 'No coding agent CLI found; local controls and the presenter path still work\n'
+    printf 'No coding agent CLI found; the deterministic workshop path still works\n'
 fi

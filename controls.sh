@@ -9,7 +9,11 @@ backup=$(mktemp)
 bad_log=$(mktemp)
 good_log=$(mktemp)
 cp "$target" "$backup"
-trap 'cp "$backup" "$target"' EXIT
+cleanup() {
+    cp "$backup" "$target"
+    rm -f "$backup" "$bad_log" "$good_log"
+}
+trap cleanup EXIT
 
 cp fixtures/bad/BorrowService.java "$target"
 if (cd bookshelf && ./mvnw -q -B -Dtest=BorrowPolicyTest test >"$bad_log" 2>&1); then

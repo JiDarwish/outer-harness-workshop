@@ -14,7 +14,9 @@ record AttemptReport(String label, AgentResult agent, List<Finding> findings) { 
 // The provider's coding agent is the inner harness. We build the outer decision loop.
 void main(String[] args) throws Exception {
     var root = Path.of("").toAbsolutePath();
-    var mode = args.length == 0 ? "noop" : args[0].replace("--agent=", "");
+    var mode = args.length == 0 || args[0].equals("--check-only")
+            ? "check-only"
+            : args[0].replace("--agent=", "");
     var agent = Agents.create(mode, root.resolve("bookshelf/src/main/java"));
     var task = Files.readString(root.resolve("harness/task.md"));
     var policy = Files.readString(root.resolve("bookshelf/approved-policy.md"));
@@ -25,20 +27,23 @@ void main(String[] args) throws Exception {
     var started = System.nanoTime();
     var reports = new ArrayList<AttemptReport>();
     var build = agent.build(prompt);
-    reports.add(new AttemptReport("build", build, checkSequence(root, build)));
+    var firstAttempt = mode.equals("check-only") ? "current" : "build";
+    reports.add(new AttemptReport(firstAttempt, build, checkSequence(root, build)));
+    show(reports.getLast());
     var repairs = 0;
     // LAB 3 — one repair at most. needsRepair and repairPrompt are yours below.
-    if (needsRepair(reports.getLast()) && repairs < 1) {
+    if (!mode.equals("check-only") && needsRepair(reports.getLast()) && repairs < 1) {
         repairs++;
         var repair = agent.build(repairPrompt(task, policy, reports.getLast()));
         reports.add(new AttemptReport("repair", repair, checkSequence(root, repair)));
+        show(reports.getLast());
     }
 
     var accepted = accepted(reports);
-    for (var report : reports) show(report);
     var unchecked = reports.stream().flatMap(report -> report.findings().stream())
             .anyMatch(Finding::unchecked);
     var elapsedMs = (System.nanoTime() - started) / 1_000_000;
+    IO.println("\n--- FINAL DECISION ---");
     IO.println("status=" + (unchecked ? "UNCHECKED" : accepted ? "ACCEPTED" : "UNRESOLVED")
             + " repairs=" + repairs + " elapsed_ms=" + elapsedMs);
     if (!accepted) System.exit(1);
@@ -85,6 +90,7 @@ boolean accepted(List<AttemptReport> reports) {
  * log paths. Keep supplied unless we decide reporting deserves workshop time.
  */
 void show(AttemptReport report) {
+    IO.println("\n--- EVIDENCE FOR " + report.label().toUpperCase() + " ---");
     IO.println("attempt=" + report.label() + " agent=" + report.agent().summary()
             + " elapsed_ms=" + report.agent().elapsedMs()
             + " input_tokens=" + AgentResult.show(report.agent().inputTokens())

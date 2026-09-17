@@ -36,9 +36,26 @@ bash preflight.sh
 
 Do this before arriving so Maven, JUnit, ArchUnit, and JBang can download. The
 workshop's scripted controls need no model login. A live run at the end needs
-either `claude` or `codex` installed and signed in. Native-access or SLF4J
-warnings can appear even when Maven tests pass; use the test result and control
-labels as your checkpoint.
+either `claude` or `codex` installed and signed in. JDK native-access or
+`Unsafe` deprecation warnings can appear even when Maven tests pass; use the
+test result and control labels as your checkpoint.
+
+## The three-stage learning flow
+
+```text
+LAB 1–2 → jbang harness/OuterHarness.java --check-only
+          Understand the sensors on current code
+
+LAB 3–4 → bash demo-repair.sh
+          Understand build → evidence → repair → recheck → decision
+
+Final   → bash verify-harness.sh
+          Challenge the completed loop against six control situations
+```
+
+The walkthrough shows one prepared repair in full. The final verifier is the
+test suite for your loop; its extra scenarios are controls, not new concepts you
+must reverse-engineer.
 
 ## Code the lab, one checkpoint at a time
 
@@ -76,13 +93,13 @@ labels as your checkpoint.
    `Finding.skipped(spec, reason)`. Run:
 
    ```bash
-   jbang harness/OuterHarness.java --agent=noop
+   jbang harness/OuterHarness.java --check-only
    ```
 
-   The no-op agent changes nothing. At this checkpoint, business behavior is
-   `FAIL`, architecture and static hygiene are `PASS`, the suite is `SKIPPED`,
-   and `status=UNRESOLVED repairs=0`. The command exits 1 on purpose. The
-   unedited starter reports `UNCHECKED`.
+   Check-only mode invokes no agent and never requests a repair. At this
+   checkpoint, business behavior is `FAIL`, architecture and static hygiene are
+   `PASS`, the suite is `SKIPPED`, and `status=UNRESOLVED repairs=0`. The command
+   exits 1 on purpose. The unedited starter reports `UNCHECKED`.
 
 5. **Bound repair and define acceptance.** Complete LAB 3 and LAB 4. Reporting
    is supplied so you can focus on the outer-loop decisions.
@@ -92,23 +109,40 @@ labels as your checkpoint.
    application repair. After repair, rerun the entire sequence. Accept only if
    the final attempt succeeded and contains a complete set of `PASS` findings.
    The supplied report shows both attempts, skipped reasons, logs, timing, and
-   available usage. Rerun the no-op command: it should show two business failures and
-   `status=UNRESOLVED repairs=1`. Then run:
+   available usage. Run one visible deterministic repair:
+
+   ```bash
+   bash demo-repair.sh
+   ```
+
+   This creates a disposable copy and tells you exactly what prepared source
+   change it will make. Watch the chronological output: the first attempt
+   produces three independent failures, all three enter one repair prompt, and
+   the repaired source is checked from the beginning. The checkpoint is
+   `status=ACCEPTED repairs=1`, followed by `WALKTHROUGH: PASS`. The script keeps
+   that disposable copy and prints its path so you can inspect the evidence.
+
+6. **Challenge the completed loop.** Now run:
 
    ```bash
    bash verify-harness.sh
    ```
 
    This is the deterministic test suite for your outer harness. It calibrates
-   your borrowing test and runs scripted good, bad, combined,
-   regressing, lint, compile, agent-failure, and check-error cases in **disposable
-   copies**. It does not edit your working production sources. The checkpoint
-   is `HARNESS CONTROL SUITE: PASS`. It uses no live model. Expect about a minute on a warm local
-   machine; inspect the labelled case and its output path if one fails.
+   your borrowing test and runs six clearly labelled scenarios in **disposable
+   copies**: valid first attempt, combined repair, compilation gate, repair
+   regression, agent failure, and broken check infrastructure. It does not edit
+   your working production sources. The checkpoint
+   is `HARNESS CONTROL SUITE: PASS`. It uses no live model. Expect roughly 20–60
+   seconds with warm local caches; inspect the labelled case and its output path
+   if one fails.
 
-6. **Try a live agent if time permits.** After the deterministic checkpoints,
+7. **Try a live agent if time permits.** After the deterministic checkpoints,
    run `jbang harness/OuterHarness.java --agent=claude` or use `--agent=codex`.
-   The Claude adapter is pinned to `sonnet`. The adapter gives the live agent an
+   The Claude adapter is pinned to `haiku`, and the Codex adapter is pinned to
+   `gpt-5.5`. These intentionally avoid each provider's strongest model so
+   the exercise can show how guidance and feedback help a less capable model.
+   The adapter gives the live agent an
    isolated copy of production Java only; it cannot read or edit your protected
    policy test. That boundary preserves an independent acceptance sensor for
    this experiment. In a real repository, an agent may also write development
@@ -122,8 +156,9 @@ labels as your checkpoint.
 If stuck, use one matching section of the
 [checkpoint-based recovery guide](help/solution.md), then rerun that section's
 command before reading further. The coding checkpoint is
-the calibrated borrowing test plus a loop that rejects no-op and structural
-regression, accepts a scripted valid repair, and rejects agent/check failures.
+the calibrated borrowing test plus a loop that accepts valid current evidence,
+repairs application failures once, rejects structural regression, and stops on
+agent or check-infrastructure failures.
 A live model does not have to converge for you to complete the workshop.
 
 The supplied ArchUnit rule checks one explicit dependency direction; it cannot

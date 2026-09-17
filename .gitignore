@@ -1,5 +1,9 @@
 # Author-only research and event logistics
-/admin/
+admin/
+todo.txt
+.agents/
+skills-lock.json
+Claude outputs/
 
 # Maven and Java build output
 /bookshelf/target/

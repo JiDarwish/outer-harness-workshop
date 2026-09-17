@@ -182,7 +182,7 @@ return findings;
 Verify LAB 1 and LAB 2:
 
 ```bash
-jbang harness/OuterHarness.java --agent=noop
+jbang harness/OuterHarness.java --check-only
 ```
 
 Expected checkpoint:
@@ -251,13 +251,14 @@ for (var finding : report.findings()) {
 return prompt.toString();
 ```
 
-Do not send only the first failure. The combined-defect control expects both
-business and architecture findings in one bounded repair request.
+Do not send only the first failure. The combined repair scenario expects static
+hygiene, business behaviour, and architecture findings in one bounded request.
 
 ## 7. LAB 4: stale results are being accepted
 
 Acceptance must inspect the final attempt only. Old passes belong to old source
-snapshots and cannot approve repaired code:
+snapshots and cannot approve repaired code. Check the names as well as the
+states so duplicates cannot masquerade as a complete result:
 
 ```java
 var finalAttempt = reports.getLast();
@@ -265,12 +266,14 @@ if (finalAttempt.agent().failed()) {
     return false;
 }
 
-if (finalAttempt.findings().size() != requiredChecks().size()) {
+var required = requiredChecks();
+if (finalAttempt.findings().size() != required.size()) {
     return false;
 }
 
-for (var finding : finalAttempt.findings()) {
-    if (!finding.passed()) {
+for (var index = 0; index < required.size(); index++) {
+    var finding = finalAttempt.findings().get(index);
+    if (!finding.name().equals(required.get(index).name()) || !finding.passed()) {
         return false;
     }
 }
@@ -284,9 +287,32 @@ Reporting is supplied in the starter so the coding time stays focused on the
 outer-loop decisions. Read the output as evidence: it shows attempts, check
 states, skipped reasons, diagnostics, log paths, timing, and available usage.
 
+## 8. Watch one complete repair
+
+Before asking the full verification suite to challenge edge cases, run one
+prepared repair where every decision remains visible:
+
+```bash
+bash demo-repair.sh
+```
+
+The script says which defects its deterministic agent will introduce in a
+disposable copy. Then read the output in this order:
+
+1. The build prompt contains the approved policy.
+2. The first attempt reports static hygiene, business behaviour, and
+   architecture failures independently.
+3. The full suite is skipped because focused evidence did not all pass.
+4. One repair prompt contains all three findings.
+5. The repair reruns the entire sequence and every required check passes.
+6. Fresh final evidence produces `status=ACCEPTED repairs=1`.
+
+The checkpoint is `WALKTHROUGH: PASS`. No live model is involved, and your
+working production sources are unchanged.
+
 <!-- OPTIONAL LAB 5 — preserved for a later workshop decision.
 
-## 8. LAB 5: report the evidence
+## OPTIONAL LAB 5: report the evidence
 
 The first line in `show` already reports the attempt and agent usage. Inside
 the findings loop, print the check identity first:
@@ -317,21 +343,9 @@ path remains available for a person who needs to investigate.
 
 End optional LAB 5. -->
 
-## 8. Final deterministic checkpoint
+## 9. Final deterministic checkpoint
 
-Run the no-op once more:
-
-```bash
-jbang harness/OuterHarness.java --agent=noop
-```
-
-It should make one repair attempt, reject the unchanged defect, and finish:
-
-```text
-status=UNRESOLVED repairs=1
-```
-
-Then run the deterministic harness verification suite:
+Run the deterministic harness verification suite:
 
 ```bash
 bash verify-harness.sh
@@ -344,15 +358,19 @@ HARNESS CONTROL SUITE: PASS
 ```
 
 This is the test suite for your outer harness. It uses disposable copies and
-deterministic agent fixtures, not a live model. If a case fails, read its
-labelled name and output path before changing the loop. Its structure cases
-demonstrate that behaviour can pass while architecture fails, including a
-repair that introduces a new dependency violation.
+deterministic agent fixtures, not a live model. Its six labels state the
+decision being tested: accept a valid first attempt, repair all independent
+failures, gate on compilation, reject a repair regression, stop on agent
+failure, and distinguish broken check infrastructure. If a case fails, read
+its label and output path before changing the loop.
 
-## 9. A live model behaves differently
+## 10. A live model behaves differently
 
 A live agent may fix the defect on its first build, need the repair call, time
 out, or fail. None of those outcomes changes the acceptance contract. Run a
 live agent only after the deterministic controls pass, and record the prompt,
 agent, date, elapsed time, repair count, accepted outcome, and available usage.
-The Claude adapter is pinned to `sonnet` for both attempts.
+The Claude adapter is pinned to `haiku`, and the Codex adapter is pinned to
+`gpt-5.5`, for both attempts. These deliberately avoid each provider's
+strongest model so the effect of the outer-harness guidance and feedback remains
+visible.
