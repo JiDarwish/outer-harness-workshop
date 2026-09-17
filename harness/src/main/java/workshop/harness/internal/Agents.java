@@ -21,7 +21,7 @@ public final class Agents {
         return switch (mode) {
             // No agent at all. The checks run against the source exactly as it stands.
             case "check-only" -> prompt -> new AgentResult(
-                    "no agent; checked existing source", false, 0, null, null, null);
+                    "not invoked (checked existing source)", false, 0, null, null, null);
             // Deterministic scenarios, used by OuterLoopBehaviourTest.
             case "valid-first", "demo", "compile-gate", "repair-regression", "agent-failure" ->
                     new ScriptedAgent(mode, productionSources);

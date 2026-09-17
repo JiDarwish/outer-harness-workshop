@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The outer loop. This is the only file you edit today.
@@ -48,9 +49,10 @@ public final class OuterHarness {
                 : args[0].replace("--agent=", "");
         var result = run(Path.of("").toAbsolutePath(), mode);
         for (var attempt : result.attempts()) show(attempt);
-        System.out.println("\n--- FINAL DECISION ---");
-        System.out.println("status=" + result.status() + " repairs=" + result.repairs()
-                + " elapsed_ms=" + result.elapsedMs());
+        System.out.println("\n=== DECISION ===");
+        System.out.println(result.status());
+        System.out.println("repairs=" + result.repairs() + "  elapsed="
+                + formatDuration(result.elapsedMs()));
         if (!result.accepted()) System.exit(1);
     }
 
@@ -137,24 +139,59 @@ public final class OuterHarness {
 
     /** Supplied. What a reader can reconstruct afterwards without rerunning anything. */
     static void show(AttemptReport report) {
-        System.out.println("\n--- EVIDENCE FOR " + report.label().toUpperCase() + " ---");
-        System.out.println("attempt=" + report.label() + " agent=" + report.agent().summary()
-                + " elapsed_ms=" + report.agent().elapsedMs()
-                + " input_tokens=" + AgentResult.show(report.agent().inputTokens())
-                + " output_tokens=" + AgentResult.show(report.agent().outputTokens())
-                + " cached_input_tokens=" + AgentResult.show(report.agent().cachedInputTokens()));
-        for (var finding : report.findings()) {
-            System.out.printf("%-24s %s%n", finding.name(), finding.state());
-            if (finding.failed() || finding.error()) {
-                System.out.println(finding.detail());
-            }
-            if (finding.state() == Finding.State.SKIPPED) {
-                System.out.println("reason=" + finding.detail());
-            }
-            if (finding.logPath() != null && (finding.failed() || finding.error())) {
-                System.out.println("full_log=" + finding.logPath());
+        System.out.println("\n=== " + attemptHeading(report.label()) + " ===");
+        System.out.println("Agent: " + report.agent().summary());
+        if (!report.label().equals("current")) {
+            System.out.println("Agent time: " + formatDuration(report.agent().elapsedMs()));
+            if (report.agent().inputTokens() != null || report.agent().outputTokens() != null
+                    || report.agent().cachedInputTokens() != null) {
+                System.out.println("Tokens: input=" + AgentResult.show(report.agent().inputTokens())
+                        + "  output=" + AgentResult.show(report.agent().outputTokens())
+                        + "  cached_input="
+                        + AgentResult.show(report.agent().cachedInputTokens()));
             }
         }
+        System.out.println();
+        for (var finding : report.findings()) {
+            System.out.printf("%-9s %s%n", finding.state(), finding.name());
+            if (finding.failed() || finding.error()) {
+                printDetail("Property", finding.property());
+                printDetail("Evidence", finding.detail());
+                printDetail("Re-run", finding.rerun());
+            }
+            if (finding.state() == Finding.State.SKIPPED) {
+                printDetail("Reason", finding.detail());
+            }
+            if (finding.logPath() != null && (finding.failed() || finding.error())) {
+                var workingDirectory = Path.of("").toAbsolutePath().normalize();
+                var log = finding.logPath().toAbsolutePath().normalize();
+                printDetail("Full log", log.startsWith(workingDirectory)
+                        ? workingDirectory.relativize(log).toString() : log.toString());
+            }
+        }
+    }
+
+    private static String attemptHeading(String label) {
+        return switch (label) {
+            case "current" -> "CURRENT SOURCE";
+            case "build" -> "BUILD ATTEMPT";
+            case "repair" -> "REPAIR ATTEMPT";
+            default -> label.toUpperCase();
+        };
+    }
+
+    private static void printDetail(String label, String value) {
+        var lines = value.lines().toList();
+        if (lines.isEmpty()) return;
+        System.out.println("          " + label + ": " + lines.getFirst());
+        for (var line : lines.subList(1, lines.size())) {
+            System.out.println("                    " + line);
+        }
+    }
+
+    private static String formatDuration(long milliseconds) {
+        return milliseconds < 1_000 ? milliseconds + "ms"
+                : String.format(Locale.ROOT, "%.1fs", milliseconds / 1_000.0);
     }
 
     private static String taskDescription() throws IOException {

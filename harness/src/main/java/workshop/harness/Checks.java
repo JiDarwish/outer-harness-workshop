@@ -107,20 +107,33 @@ final class Checks {
             return String.join("\n", output.lines().filter(line -> line.startsWith("[LINT]"))
                     .limit(6).map(Checks::shortLine).toList());
         }
-        var useful = output.lines()
-                .filter(line -> line.contains("expected:") || line.contains("Architecture Violation")
+        var useful = output.lines().map(String::strip)
+                .filter(line -> line.startsWith("[ERROR]   ")
+                        && (line.contains("expected:") || line.contains("AssertionFailedError")))
+                .map(Checks::withoutMavenPrefix)
+                .distinct().limit(1).map(Checks::shortLine).toList();
+        if (!useful.isEmpty()) return String.join("\n", useful);
+
+        useful = output.lines().map(String::strip)
+                .filter(line -> line.contains("Architecture Violation")
                         || line.matches("^(Method|Constructor|Field|Class) <.*")
-                        || line.contains(".java:[") || line.contains("[ERROR] Failures:")
-                        || line.contains("[ERROR] Errors:")
-                        || line.contains("[ERROR] Tests run:"))
-                .distinct().limit(6).map(Checks::shortLine).toList();
+                        || line.contains(".java:["))
+                .map(Checks::withoutMavenPrefix)
+                .distinct().limit(4).map(Checks::shortLine).toList();
         if (!useful.isEmpty()) return String.join("\n", useful);
         var errors = output.lines().filter(line -> line.contains("[ERROR]"))
                 .filter(line -> !line.contains("Failed to execute goal")
                         && !line.contains("See ") && !line.contains("[Help"))
-                .distinct().limit(4).map(Checks::shortLine).toList();
+                .map(Checks::withoutMavenPrefix)
+                .distinct().limit(2).map(Checks::shortLine).toList();
         return errors.isEmpty() ? "Failed " + spec.property() + "; rerun for full output"
                 : String.join("\n", errors);
+    }
+
+    private static String withoutMavenPrefix(String line) {
+        return line.replaceFirst("^\\[ERROR]\\s*", "")
+                .replaceFirst("expected: <([^>]*)> but was: <([^>]*)>",
+                        "expected $1 but was $2");
     }
 
     private static String shortLine(String line) {
