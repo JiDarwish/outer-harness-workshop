@@ -26,6 +26,14 @@ rule into a computational sensor.
 
 `bookshelf/src/test/java/workshop/bookshelf/BorrowPolicyTest.java`
 
+Add these imports if your IDE does not add them automatically:
+
+```java
+import workshop.bookshelf.domain.BorrowOutcome;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+```
+
 Replace the **entire test method** with the method below. In particular, remove the
 starter's unasserted `service.borrow(1, aliceId)` call. Keeping it and then pasting the
 assertions underneath would make Alice borrow once during setup and then incorrectly ask
