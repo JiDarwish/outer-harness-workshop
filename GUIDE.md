@@ -339,3 +339,160 @@ control, one valid control, the repair budget, what you would measure, and **the
 decision that stays with a person**.
 
 If you cannot name that last one, the loop is not finished. It is just unattended.
+
+---
+
+## 8. BONUS — build the inner harness
+
+Finished the main workshop early? This branch contains a third Maven module that opens
+the coding agent we treated as a black box. You will implement the small conversation
+loop that turns a model with tools into an agent.
+
+Allow about 20–30 minutes. The deterministic exercises need no model account or API key.
+
+### Keep the boundary clear
+
+The main workshop built `harness/`: guides, sensors, bounded repair and the final decision
+around a complete coding agent. This bonus builds `inner-harness/`: conversation state,
+tool dispatch, permissions, stopping conditions and on-demand context inside one agent
+invocation.
+
+```text
+task
+  ↓
+model response
+  ↓
+tool call? ── no ──→ stop
+  │
+ yes
+  ↓
+permission and dispatch
+  ↓
+tool result
+  └────────────────→ model again
+```
+
+Keep Bookshelf policy, business tests, architecture checks, repair prompts and acceptance
+decisions out of this module. Those belong to the outer harness.
+
+### Find the seam
+
+Open these three files:
+
+- `inner-harness/src/main/java/workshop/innerharness/InnerHarness.java` — your exercise
+- `inner-harness/src/main/java/workshop/innerharness/AnthropicSession.java` — supplied
+  provider translation
+- `inner-harness/src/main/java/workshop/innerharness/BuiltinTools.java` — supplied tool
+  implementations and path/permission boundaries
+
+`ModelSession` hides Anthropic's protocol types, but it does not make decisions for the
+loop. `start` sends the task. `continueWith` appends the assistant turn and tool results
+to the same conversation before asking the model again.
+
+Run the starter tests:
+
+```bash
+./mvnw -pl inner-harness test
+```
+
+All five should be red. Read the test names: each one describes a responsibility that is
+still missing from the inner loop.
+
+### BONUS 1 — complete the model/tool loop
+
+Work only in `InnerHarness.run`.
+
+For every model turn:
+
+1. Accumulate its token counts and record the turn — the starter already does this.
+2. If it contains no tool calls, stop with `COMPLETED`, the current turn number and the
+   model's text.
+3. Otherwise execute **every** call through `tools.execute(call)`.
+4. Add a trace line such as `tool=read_file result=pass` or `result=fail`.
+5. If the turn budget is now exhausted, stop without another model request.
+6. Otherwise call `session.continueWith(results)` and repeat.
+
+Keep one list of results per turn. A useful shape is:
+
+```java
+var results = new ArrayList<ToolResult>();
+for (var call : turn.toolCalls()) {
+    var result = tools.execute(call);
+    results.add(result);
+    // Record the result in trace.
+}
+```
+
+The turn budget counts model responses. Tool execution does not secretly grant another
+model call.
+
+```bash
+./mvnw -pl inner-harness test
+```
+
+**Checkpoint:** four tests pass. Only
+`loadsSkillContentOnlyWhenTheModelRequestsIt` should still fail.
+
+### BONUS 2 — add progressive skill loading
+
+A skill has two parts:
+
+- small metadata tells the model what knowledge is available;
+- the full `SKILL.md` enters the conversation only if the model calls `load_skill`.
+
+That is progressive disclosure. It avoids putting every optional instruction into every
+request.
+
+The Anthropic adapter already advertises `concise-java`, and `BuiltinTools.LoadSkill`
+already reads a requested skill safely. In `InnerHarness.defaultTools`, register one
+`LoadSkill` instance alongside the read and write tools. Use the supplied `skillRoot`.
+
+```bash
+./mvnw -pl inner-harness test
+```
+
+**Checkpoint:** all five tests pass.
+
+The loading mechanism belongs to the inner harness. The contents of a real company skill
+are guidance supplied by its users. This exercise implements the mechanism and uses a
+small neutral skill only to prove that it works.
+
+### Optional — use the real Anthropic API
+
+The deterministic tests are the completion criterion. If you also have an Anthropic API
+key, run the same loop against Claude Haiku:
+
+```bash
+export ANTHROPIC_API_KEY=your-key
+./mvnw -pl inner-harness compile exec:java
+```
+
+The demo creates `inner-harness/target/live-workspace/Example.java`. The model should load
+the skill, read the file and ask before writing `Review.md`. The generated file remains
+under `target/` and is not part of the repository.
+
+Watch for four things:
+
+- more than one model turn;
+- `load_skill` and `read_file` results returning into the conversation;
+- a human permission boundary before `write_file`;
+- a visible stopping reason and token total.
+
+Live output is variable. A model may choose different tools or decline to write. The
+scripted tests establish the loop behaviour; the live run only lets you observe it.
+
+### Debrief
+
+You have now built the beginning of a coding agent:
+
+```java
+while (turnBudgetRemains()) {
+    var response = model.respond(conversation);
+    if (response.isFinal()) return response;
+    conversation.add(execute(response.toolCalls()));
+}
+```
+
+The model proposes. The inner harness preserves state, controls available actions,
+executes tools, returns observations and decides when one invocation must stop. The
+outer harness then decides whether the resulting work is acceptable.

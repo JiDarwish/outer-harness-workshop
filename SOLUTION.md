@@ -253,3 +253,130 @@ control paths; this live run shows those decisions surrounding a real inner harn
 Claude works on an isolated production-only copy, then successful Java changes are copied
 back to `bookshelf/src/main/java` before your sensors run. Open `BorrowService.java` after
 the command if you want to inspect the candidate that received the final verdict.
+
+---
+
+## 8. BONUS — the inner-harness loop
+
+This section belongs to the optional `inner-harness` module on the
+`bonus-inner-harness` branch. Use one subsection at a time.
+
+### The starter has five failing tests
+
+That is deliberate. `InnerHarness.run` receives the first model turn but never acts on
+it, so every scenario eventually reports `TURN_LIMIT_REACHED`.
+
+```bash
+./mvnw -pl inner-harness test
+```
+
+Do not change the scripted tests or the supplied Anthropic adapter. The same loop must
+work with both.
+
+### BONUS 1 — complete `run`
+
+Replace `InnerHarness.run` with:
+
+```java
+public RunResult run(String task) {
+    var trace = new ArrayList<String>();
+    var turn = session.start(task);
+    long inputTokens = 0;
+    long outputTokens = 0;
+
+    for (var turnNumber = 1; turnNumber <= maxTurns; turnNumber++) {
+        inputTokens += turn.inputTokens();
+        outputTokens += turn.outputTokens();
+        trace.add("turn=" + turnNumber + " tool_calls=" + turn.toolCalls().size());
+
+        if (turn.toolCalls().isEmpty()) {
+            trace.add("stop=completed");
+            return new RunResult(StopReason.COMPLETED, turnNumber, turn.text(),
+                    inputTokens, outputTokens, trace);
+        }
+
+        var results = new ArrayList<ToolResult>();
+        for (var call : turn.toolCalls()) {
+            var result = tools.execute(call);
+            results.add(result);
+            trace.add("tool=" + call.name() + " result="
+                    + (result.succeeded() ? "pass" : "fail"));
+        }
+
+        if (turnNumber == maxTurns) break;
+        turn = session.continueWith(results);
+    }
+
+    trace.add("stop=turn_limit");
+    return new RunResult(StopReason.TURN_LIMIT_REACHED, maxTurns, "",
+            inputTokens, outputTokens, trace);
+}
+```
+
+The order matters:
+
+1. A response with no tool calls is the final answer.
+2. Every tool call in a response is executed.
+3. The results return together as the next observation.
+4. At the limit, the harness does not make one extra model request.
+
+Rerun the tests. Four should pass; skill loading remains red.
+
+### BONUS 2 — register the skill loader
+
+In `defaultTools`, extend the registry chain by one line:
+
+```java
+var tools = new ToolRegistry()
+        .register(new BuiltinTools.ReadFile(workspace))
+        .register(new BuiltinTools.WriteFile(workspace, approvalPolicy))
+        .register(new BuiltinTools.LoadSkill(skillRoot));
+```
+
+Then run:
+
+```bash
+./mvnw -pl inner-harness test
+```
+
+Expected checkpoint:
+
+```text
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+The adapter advertised only the skill's name and purpose. The complete file entered the
+conversation when the model requested `load_skill`; that is the progressive-disclosure
+mechanism you just connected.
+
+### The live run cannot find credentials
+
+The deterministic bonus is already complete. A live run additionally requires an
+Anthropic API key in the same terminal:
+
+```bash
+export ANTHROPIC_API_KEY=your-key
+./mvnw -pl inner-harness compile exec:java
+```
+
+Authentication through Claude Code does not automatically create
+`ANTHROPIC_API_KEY` for the Java SDK.
+
+### The model asks to write, but no file appears
+
+`write_file` is permission-gated. Enter `y` when the process asks:
+
+```text
+Allow write_file for Review.md? [y/N]
+```
+
+Anything else returns a failed tool result to the model and leaves the workspace
+unchanged. That denial is part of the conversation rather than an invisible exception.
+
+### The live run reaches the turn limit
+
+This is a valid controlled stop, not acceptance. Inspect the trace to see whether the
+model repeatedly requested a tool, received a failed result, or never produced a final
+answer. The inner harness ends the invocation; it does not decide whether generated work
+is acceptable.

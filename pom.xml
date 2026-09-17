@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Aggregator only. It builds both modules together, but neither module declares this
+  Aggregator only. It builds all three modules together, but no module declares this
   file as its parent: `bookshelf` must stay buildable on its own, because the outer
   harness runs its checks against disposable COPIES of that directory.
 -->
@@ -16,5 +16,6 @@
     <modules>
         <module>bookshelf</module>
         <module>harness</module>
+        <module>inner-harness</module>
     </modules>
 </project>
