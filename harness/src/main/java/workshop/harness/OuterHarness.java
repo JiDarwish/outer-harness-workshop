@@ -21,6 +21,10 @@ import java.util.List;
  */
 public final class OuterHarness {
 
+    // Workshop default: one repair keeps the run short. Change this to 3 (or another
+    // positive limit) to allow more evidence → repair → fresh evidence cycles.
+    static final int MAX_REPAIRS = 1;
+
     private OuterHarness() { }
 
     /** Everything one run of the loop decided, so a test can inspect it without parsing logs. */
@@ -48,7 +52,7 @@ public final class OuterHarness {
                 : args[0].replace("--agent=", "");
         var reporter = RunReporter.console(mode);
         var result = run(Path.of("").toAbsolutePath(), mode, reporter);
-        reporter.finished(result);
+        reporter.finished(result, MAX_REPAIRS);
         if (!result.accepted()) System.exit(1);
     }
 
@@ -87,22 +91,32 @@ public final class OuterHarness {
         reporter.evidence(buildLabel, buildReport.findings());
 
         var repairs = 0;
-        // LAB 2 — see GUIDE.md section 5. One repair at most, and only when the evidence
-        // justifies one. The budget is per attempt, not per finding.
-        var repairNeeded = !checkOnly && needsRepair(buildReport) && repairs < 1;
-        if (repairNeeded) {
+        // LAB 2 — see GUIDE.md section 5. Repair only while the latest evidence justifies
+        // it and budget remains. The budget is per attempt, not per finding.
+        while (!checkOnly && needsRepair(attempts.getLast()) && repairs < MAX_REPAIRS) {
+            var previous = attempts.getLast();
             repairs++;
-            var repairPrompt = repairPrompt(task, policy, buildReport);
-            reporter.repairRequested(buildReport);
-            reporter.repairStarted(repairPrompt);
+            var repairPrompt = repairPrompt(task, policy, previous);
+            reporter.repairRequested(previous, repairs, MAX_REPAIRS);
+            reporter.repairStarted(repairPrompt, repairs, MAX_REPAIRS);
             var repair = agent.build(repairPrompt, reporter::activity);
             reporter.candidate(repair);
-            var repairReport = new AttemptReport("repair", repairPrompt, repair,
+            var repairLabel = repairs == 1 ? "repair" : "repair-" + repairs;
+            var repairReport = new AttemptReport(repairLabel, repairPrompt, repair,
                     checkSequence(root, repair));
             attempts.add(repairReport);
-            reporter.evidence("repair", repairReport.findings());
-        } else if (!checkOnly) {
-            reporter.noRepair(buildReport);
+            reporter.evidence(repairLabel, repairReport.findings());
+        }
+
+        if (!checkOnly) {
+            var last = attempts.getLast();
+            if (needsRepair(last) && repairs >= MAX_REPAIRS) {
+                reporter.budgetExhausted(repairs, MAX_REPAIRS);
+            } else if (repairs == 0 || last.agent().failed()
+                    || last.findings().stream().anyMatch(
+                            finding -> finding.error() || finding.unchecked())) {
+                reporter.noRepair(last);
+            }
         }
 
         var unchecked = attempts.stream().flatMap(attempt -> attempt.findings().stream())

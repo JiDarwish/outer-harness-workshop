@@ -118,6 +118,29 @@ stop before the expensive one when something has already failed.
 The rule that is not negotiable: **a non-PASS result must never hide another independent
 finding**, and a stage that did not run must say so. Silence is not a pass.
 
+### The small API you need
+
+The plumbing is supplied. These are the methods you need to express the decisions in
+Labs 1–3; you do not need to discover another API before you start:
+
+```java
+report.agent().failed()                 // the agent produced no candidate
+report.findings()                       // findings from this exact attempt
+
+finding.passed()                        // PASS
+finding.failed()                        // FAIL
+finding.error()                         // ERROR
+finding.unchecked()                     // UNCHECKED
+
+finding.name()                          // named check, such as BUSINESS_BEHAVIOR
+finding.property()                      // the property that check protects
+finding.detail()                        // short failure diagnostic
+finding.rerun()                         // exact reproduction command
+
+requiredChecks()                        // every check acceptance requires
+spec.name()                             // the name of one required check
+```
+
 ### Do this
 
 1. Build `prompt` from `task.md` **and** `approved-policy.md`.
@@ -178,6 +201,17 @@ exists and what a good solution looks like. Compact diagnostics are what made re
 in her field experience, not more output.
 
 ### Do this
+
+Near the top of `OuterHarness.java`, the supplied loop declares its budget:
+
+```java
+static final int MAX_REPAIRS = 1;
+```
+
+The workshop keeps it at one so every run is short. You can change that single value to
+`3` if you want to allow up to three repairs. The loop stops earlier when the candidate
+passes, the agent fails, or a sensor cannot produce a trustworthy verdict. The limit is a
+maximum, not a target.
 
 - `needsRepair`: application FAIL findings only. An agent failure, a check ERROR, or
   UNCHECKED evidence means there is no trustworthy defect to repair against.
@@ -266,8 +300,8 @@ The adapters are pinned to Claude `haiku` and Codex `gpt-5.5`. They deliberately
 each provider's strongest model so the surrounding guidance and feedback have a chance
 to become visible.
 
-A live model may finish with `repairs=0` or `repairs=1` — it may simply get it right
-first time. Do not force a failure just to show the retry. The six deterministic
+A live model may use anything from zero repairs up to `MAX_REPAIRS` — it may simply get it
+right first time. Do not force a failure just to show the retry. The six deterministic
 scenarios are what prove every control path; the live run is the eye test that connects
 those controls to an actual inner harness.
 
