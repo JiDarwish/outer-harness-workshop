@@ -134,7 +134,8 @@ class OuterLoopBehaviourTest {
                 attempt. Two green labels exist, but they belong to two different versions of
                 the source. Accumulating green across attempts is the easiest way to build a
                 loop that accepts broken work.""");
-        assertEquals(1, result.repairs());
+        assertEquals(OuterHarness.MAX_REPAIRS, result.repairs(),
+                "an unresolved repair should stop at the configured budget");
 
         assertEquals("FAIL", result.stateOf("build", "BUSINESS_BEHAVIOR"));
         assertEquals("PASS", result.stateOf("build", "ARCHITECTURE_BOUNDARY"));

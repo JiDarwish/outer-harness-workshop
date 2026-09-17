@@ -52,7 +52,7 @@ class OracleCalibrationTest {
 
                 BorrowPolicyTest rejected a correct implementation. A check that fires on
                 valid code will send the agent chasing a defect that is not there, and it
-                will burn your one repair doing it."""
+                will burn your repair budget doing it."""
                 + "\n\nMaven output:\n" + run.output());
     }
 }

@@ -236,7 +236,7 @@ SENSORS AFTER ACTION
   evidence collected by your outer harness
 
 OUTER-HARNESS DECISION
-  accept, refuse, or spend the one repair
+  accept, refuse, or spend the next repair from the configured budget
 
 FRESH SENSORS AFTER ACTION
   shown only when a repair was requested
@@ -244,10 +244,10 @@ FRESH SENSORS AFTER ACTION
 FINAL DECISION
 ```
 
-A live model may finish with zero repairs because it got it right first time, with one
-repair, or without converging. None of those outcomes by itself proves your loop right or
-wrong. The six deterministic scenarios prove its control decisions; this live run shows
-those controls surrounding a real inner harness.
+A live model may finish with zero repairs because it got it right first time, use anything
+up to `MAX_REPAIRS`, or stop without converging. None of those outcomes by itself proves
+your loop right or wrong. The six deterministic scenarios prove its control decisions;
+this live run shows those controls surrounding a real inner harness.
 
 Claude works on an isolated production-only copy, then successful Java changes are copied
 back to `bookshelf/src/main/java` before your sensors run. Open `BorrowService.java` after

@@ -75,11 +75,9 @@ final class RunReporter {
 
     void evidence(String attemptLabel, List<Finding> findings) {
         if (!visible) return;
-        var title = switch (attemptLabel) {
-            case "current" -> "SENSORS ON CURRENT SOURCE";
-            case "repair" -> "FRESH SENSORS AFTER ACTION";
-            default -> "SENSORS AFTER ACTION";
-        };
+        var title = attemptLabel.equals("current") ? "SENSORS ON CURRENT SOURCE"
+                : attemptLabel.startsWith("repair") ? "FRESH SENSORS AFTER ACTION"
+                : "SENSORS AFTER ACTION";
         heading(title);
         for (var finding : findings) {
             System.out.printf("%-9s %s%n", finding.state(), finding.name());
@@ -93,20 +91,23 @@ final class RunReporter {
         }
     }
 
-    void repairRequested(AttemptReport report) {
+    void repairRequested(AttemptReport report, int repairNumber, int maxRepairs) {
         if (!visible) return;
         heading("OUTER-HARNESS DECISION");
         var failures = report.findings().stream().filter(Finding::failed).toList();
         System.out.println(failures.size() + " application "
                 + (failures.size() == 1 ? "failure was" : "failures were") + " found.");
         System.out.println("No sensor returned ERROR or UNCHECKED.");
-        System.out.println("One repair remains.\n");
-        System.out.println("Decision: request one repair.");
+        System.out.println("Repair budget: " + repairNumber + " of " + maxRepairs
+                + " will be used.\n");
+        System.out.println("Decision: request repair " + repairNumber + " of " + maxRepairs
+                + ".");
     }
 
-    void repairStarted(String repairPrompt) {
+    void repairStarted(String repairPrompt, int repairNumber, int maxRepairs) {
         if (!visible) return;
-        heading("REPAIR ATTEMPT — " + agentName().toUpperCase(Locale.ROOT));
+        heading("REPAIR ATTEMPT " + repairNumber + " OF " + maxRepairs + " — "
+                + agentName().toUpperCase(Locale.ROOT));
         System.out.println("\nPrompt sent to " + agentName() + ":\n");
         for (var line : repairPrompt.lines().toList()) {
             System.out.println("  " + line);
@@ -133,14 +134,23 @@ final class RunReporter {
         }
     }
 
-    void finished(OuterHarness.RunResult result) {
+    void budgetExhausted(int repairs, int maxRepairs) {
+        if (!visible) return;
+        heading("OUTER-HARNESS DECISION");
+        System.out.println("Decision: stop without accepting the candidate.");
+        System.out.println("Reason: the latest evidence still contains an application failure,");
+        System.out.println("        and the repair budget is exhausted (" + repairs + " of "
+                + maxRepairs + ").");
+    }
+
+    void finished(OuterHarness.RunResult result, int maxRepairs) {
         if (!visible) return;
         heading("FINAL DECISION");
         System.out.println(result.status());
         System.out.println("Attempts: " + result.attempts().size());
         System.out.println(mode.equals("check-only")
                 ? "Repairs: disabled in check-only mode"
-                : "Repairs used: " + result.repairs() + " of 1");
+                : "Repairs used: " + result.repairs() + " of " + maxRepairs);
         System.out.println("Elapsed: " + duration(result.elapsedMs()));
     }
 
