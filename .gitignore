@@ -5,16 +5,13 @@ todo.txt
 skills-lock.json
 Claude outputs/
 
-# Maven and Java build output
-/bookshelf/target/
+# Maven build output (both modules)
+target/
 *.class
 *.hprof
 *.log
 
-# Local JBang output
-/.jbang/
-
-# IDE files (the Maven project is defined by bookshelf/pom.xml)
+# IDE files
 .idea/
 .vscode/
 *.iml

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>workshop</groupId>
+    <artifactId>harness</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <!--
+      There is deliberately NO dependency on the `bookshelf` module.
+
+      The outer harness must have no compile-time knowledge of the system it governs.
+      It reaches the Bookshelf only as a directory of source text and by running Maven
+      on it as a separate process. That is what makes its checks independent, and it is
+      the whole point of the workshop. If you ever find yourself wanting to `import
+      workshop.bookshelf.something` in here, stop: the thing you want is evidence from a
+      check, not a type.
+    -->
+
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Where the system under test lives, relative to this module. -->
+        <workshop.bookshelf.dir>${project.basedir}/../bookshelf</workshop.bookshelf.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.17.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.12.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <workshop.bookshelf.dir>${workshop.bookshelf.dir}</workshop.bookshelf.dir>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <!-- Backs ./harness.sh — participants never type this by hand. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>workshop.harness.OuterHarness</mainClass>
+                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
