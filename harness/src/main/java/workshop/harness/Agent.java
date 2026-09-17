@@ -1,5 +1,7 @@
 package workshop.harness;
 
+import java.util.function.Consumer;
+
 /**
  * The existing coding agent, viewed through the one operation the outer loop needs.
  *
@@ -9,4 +11,13 @@ package workshop.harness;
  */
 public interface Agent {
     AgentResult build(String prompt);
+
+    /**
+     * Build while reporting a small, provider-neutral view of visible tool activity.
+     * Deterministic agents have nothing useful to stream, so their existing method is
+     * the default. Real CLI adapters override this overload.
+     */
+    default AgentResult build(String prompt, Consumer<String> activity) {
+        return build(prompt);
+    }
 }

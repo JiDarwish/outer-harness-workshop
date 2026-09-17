@@ -231,19 +231,45 @@ calibrated. It declines to certify a loop whose oracle has never been challenged
 
 ---
 
-## 7. Optional — a live agent
+## 7. Capstone — see the complete workflow
 
 ```bash
 ./harness.sh live claude     # or: ./harness.sh live codex
 ```
 
+This connects the outer harness you wrote to a real inner harness:
+
+```text
+task.md + approved-policy.md
+             ↓
+       Claude Code
+       (inner harness)
+             ↓
+         candidate
+             ↓
+         your sensors
+             ↓
+   your evidence and decision
+```
+
+Watch the boundaries in the terminal. It first names the guides sent before action.
+Claude Code then streams the production files it reads and edits. Only after Claude
+finishes do your sensors run. If their evidence justifies a repair, the outer harness
+sends one focused prompt and collects a fresh set of findings before deciding.
+
+The adapter gives Claude an isolated copy containing production Java only. It cannot
+inspect or edit your tests or harness. A successful candidate is copied back to
+`bookshelf/src/main/java` before the sensors run, so you can open the changed source when
+the command finishes.
+
 The adapters are pinned to Claude `haiku` and Codex `gpt-5.5`. They deliberately avoid
-each provider's strongest model so you can observe what the outer guidance and feedback
-contribute.
+each provider's strongest model so the surrounding guidance and feedback have a chance
+to become visible.
 
 A live model may finish with `repairs=0` or `repairs=1` — it may simply get it right
-first time. That is why scenario 2 exists: only the deterministic path guarantees you
-see the repair happen.
+first time. Do not force a failure just to show the retry. The six deterministic
+scenarios are what prove every control path; the live run is the eye test that connects
+those controls to an actual inner harness.
 
 ---
 

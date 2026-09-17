@@ -143,7 +143,7 @@ so there is no defect to describe — you would be asking the agent to fix your 
 var prompt = new StringBuilder(task)
         .append("\n\nApproved policy:\n").append(policy)
         .append("\n\nEvery check below failed on the code you just wrote. ")
-        .append("Fix all of them in one pass.\n");
+        .append("Fix all of them in one pass. Preserve the checks that already passed.\n");
 for (var finding : report.findings()) {
     if (!finding.failed()) continue;
     prompt.append("\n- check: ").append(finding.name())
@@ -217,12 +217,38 @@ Common causes, in the order they usually bite:
 
 ---
 
-## A live run behaves differently
+## The complete live workflow
 
 ```bash
 ./harness.sh live claude
 ```
 
-Expected. A live model may finish with `repairs=0` because it got it right first time, or
-with `repairs=1`, or not converge at all. None of that means your loop is wrong — your
-loop is judged by the six deterministic scenarios, which is precisely why they exist.
+Read the headings as the architecture of the system:
+
+```text
+GUIDES BEFORE ACTION
+  task.md + approved-policy.md
+
+BUILD ATTEMPT — CLAUDE CODE
+  visible Read/Edit activity from the inner harness
+
+SENSORS AFTER ACTION
+  evidence collected by your outer harness
+
+OUTER-HARNESS DECISION
+  accept, refuse, or spend the one repair
+
+FRESH SENSORS AFTER ACTION
+  shown only when a repair was requested
+
+FINAL DECISION
+```
+
+A live model may finish with zero repairs because it got it right first time, with one
+repair, or without converging. None of those outcomes by itself proves your loop right or
+wrong. The six deterministic scenarios prove its control decisions; this live run shows
+those controls surrounding a real inner harness.
+
+Claude works on an isolated production-only copy, then successful Java changes are copied
+back to `bookshelf/src/main/java` before your sensors run. Open `BorrowService.java` after
+the command if you want to inspect the candidate that received the final verdict.
