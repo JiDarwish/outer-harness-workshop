@@ -6,7 +6,9 @@ repair budget, and the rule for what counts as a yes.
 
 ## Prerequisites
 
-**Java 25** and **Git**. That is all — there is no other tool to install.
+The core workshop requires **Java 25** and **Git**. The final live workflow also requires
+the Claude Code CLI to be installed and signed in; everything before that capstone runs
+without a model account.
 
 ```bash
 java -version          # must report 25
@@ -43,10 +45,10 @@ Use Maven's final result and the named check states as your checkpoint.
 | Run the Bookshelf's own tests | `./mvnw -pl bookshelf test` |
 | Run your outer loop against the real Bookshelf | `./harness.sh check` |
 | Prove your loop handles all six behaviours | `./mvnw -pl harness test` |
-| Optional: drive a real coding agent | `./harness.sh live claude` |
+| Run the complete workflow with Claude Code | `./harness.sh live claude` |
 
-The optional adapters deliberately use older models: Claude `haiku` and Codex
-`gpt-5.5`. The deterministic workshop path does not require either CLI or a model login.
+The live adapters deliberately use older models: Claude `haiku` and Codex `gpt-5.5`.
+The deterministic workshop path does not require either CLI or a model login.
 
 ## The two halves
 
