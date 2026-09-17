@@ -18,11 +18,18 @@ Using SDKMAN? This repository ships a `.sdkmanrc`, so you can just run:
 sdk env                # switches this shell to Java 25
 ```
 
-Then warm the dependency cache — the only step that needs the network:
+Before the workshop, run all three commands once with a network connection. Together
+they cache the compiler, test runner, and harness-launch dependencies:
 
 ```bash
-./mvnw test-compile     # about a minute the first time
+./mvnw test-compile
+./mvnw -pl bookshelf test
+./harness.sh check
 ```
+
+The Bookshelf test passes at this point: that false green starts section 1. The final
+command exits 1 with `UNCHECKED` because you have not wired the outer harness yet. Both
+results are expected.
 
 **Do this before you arrive.**
 
