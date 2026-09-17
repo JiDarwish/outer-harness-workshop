@@ -1,57 +1,38 @@
+package workshop.harness;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-/** One check on one agent attempt. The outer loop groups findings by attempt. */
-record Finding(String name, String property, State state, String detail, String rerun,
-               long elapsedMs, Path logPath) {
-    enum State { UNCHECKED, PASS, FAIL, ERROR, SKIPPED }
+import workshop.harness.Finding.State;
 
-    static Finding notWired() {
-        return new Finding("UNWIRED_CHECK", "", State.UNCHECKED, "No check wired", "", 0, null);
-    }
-
-    static Finding skipped(CheckSpec spec, String reason) {
-        return new Finding(spec.name(), spec.property(), State.SKIPPED, reason,
-                spec.rerun(), 0, null);
-    }
-
-    boolean unchecked() { return state == State.UNCHECKED; }
-    boolean failed() { return state == State.FAIL; }
-    boolean error() { return state == State.ERROR; }
-    boolean passed() { return state == State.PASS; }
-}
-
-/** Purpose and executable command stay separate: today's JUnit test is one business sensor. */
-enum CheckKind { MAVEN, LINT }
-
-record CheckSpec(String name, String property, List<String> command, CheckKind kind) {
-    CheckSpec(String name, String property, List<String> command) {
-        this(name, property, command, CheckKind.MAVEN);
-    }
-
-    String rerun() { return "cd bookshelf && " + String.join(" ", command); }
-}
-
-/** Supplied Maven process plumbing. Participants choose which named checks to run. */
+/** Supplied process plumbing. Participants choose which named checks to run, and when. */
 final class Checks {
+
+    /**
+     * How to invoke Maven. Defaults to the wrapper inside the Bookshelf copy; override
+     * with -Dworkshop.maven.cmd=mvn where a system Maven is preferred (CI, offline).
+     */
+    private static final String MAVEN = System.getProperty("workshop.maven.cmd", "./mvnw");
+
+
     static final CheckSpec COMPILE = new CheckSpec("COMPILE",
             "production Java sources compile",
-            List.of("./mvnw", "-q", "-B", "compile"));
+            List.of(MAVEN, "-B", "compile"));
     static final CheckSpec STATIC_HYGIENE = new CheckSpec("STATIC_HYGIENE",
             "production library code does not write directly to the console",
-            List.of("java", "../harness/StaticHygiene.java", "src/main/java"), CheckKind.LINT);
+            List.of(), CheckKind.LINT);
     static final CheckSpec BUSINESS_BEHAVIOR = new CheckSpec("BUSINESS_BEHAVIOR",
             "the approved borrowing policy",
-            List.of("./mvnw", "-q", "-B", "-Dtest=BorrowPolicyTest", "test"));
+            List.of(MAVEN, "-B", "-Dtest=BorrowPolicyTest", "test"));
     static final CheckSpec ARCHITECTURE_BOUNDARY = new CheckSpec("ARCHITECTURE_BOUNDARY",
             "domain classes do not depend on service or storage",
-            List.of("./mvnw", "-q", "-B", "-Dtest=ArchitectureTest", "test"));
+            List.of(MAVEN, "-B", "-Dtest=ArchitectureTest", "test"));
     static final CheckSpec FULL_TEST_SUITE = new CheckSpec("FULL_TEST_SUITE",
             "all existing Bookshelf tests still pass",
-            List.of("./mvnw", "-q", "-B", "test"));
+            List.of(MAVEN, "-B", "test"));
 
     private Checks() { }
 
@@ -63,31 +44,53 @@ final class Checks {
             var reports = bookshelf.resolve("target/harness-reports");
             Files.createDirectories(reports);
             log = Files.createTempFile(reports, spec.name().toLowerCase() + "-", ".log");
-            var process = new ProcessBuilder(spec.command()).directory(bookshelf.toFile())
-                    .redirectInput(new java.io.File("/dev/null"))
-                    .redirectErrorStream(true).redirectOutput(log.toFile()).start();
-            if (!process.waitFor(120, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                return result(spec, Finding.State.ERROR, "Check timed out after 120 seconds",
-                        started, log);
-            }
-            var output = Files.readString(log);
-            if (process.exitValue() == 0) {
-                return result(spec, Finding.State.PASS, "", started, log);
-            }
-            if (applicationFailure(output, spec)) {
-                return result(spec, Finding.State.FAIL, diagnostic(output, spec), started, log);
-            }
-            return result(spec, Finding.State.ERROR,
-                    "Maven exited " + process.exitValue() + " without a recognizable code or test failure",
-                    started, log);
+            return spec.kind() == CheckKind.LINT
+                    ? lint(spec, bookshelf, started, log)
+                    : maven(spec, bookshelf, started, log);
         } catch (IOException e) {
-            return result(spec, Finding.State.ERROR, "Could not run/read check: " + e.getMessage(),
+            return result(spec, State.ERROR, "Could not run/read check: " + e.getMessage(),
                     started, log);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return result(spec, Finding.State.ERROR, "Check command interrupted", started, log);
+            return result(spec, State.ERROR, "Check command interrupted", started, log);
         }
+    }
+
+    /** The static sensor is a library call, not a subprocess: same verdict, no process spawn. */
+    private static Finding lint(CheckSpec spec, Path bookshelf, long started, Path log) {
+        try {
+            var inspection = StaticHygiene.inspect(bookshelf.resolve("src/main/java"));
+            Files.writeString(log, inspection.output());
+            return inspection.clean()
+                    ? result(spec, State.PASS, "", started, log)
+                    : result(spec, State.FAIL, diagnostic(inspection.output(), spec),
+                            started, log);
+        } catch (Exception e) {
+            return result(spec, State.ERROR,
+                    "Static sensor could not produce a verdict: " + e.getMessage(), started, log);
+        }
+    }
+
+    private static Finding maven(CheckSpec spec, Path bookshelf, long started, Path log)
+            throws IOException, InterruptedException {
+        var process = new ProcessBuilder(spec.command()).directory(bookshelf.toFile())
+                .redirectInput(new java.io.File("/dev/null"))
+                .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        if (!process.waitFor(120, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            return result(spec, State.ERROR, "Check timed out after 120 seconds",
+                    started, log);
+        }
+        var output = Files.readString(log);
+        if (process.exitValue() == 0) {
+            return result(spec, State.PASS, "", started, log);
+        }
+        if (applicationFailure(output, spec)) {
+            return result(spec, State.FAIL, diagnostic(output, spec), started, log);
+        }
+        return result(spec, State.ERROR,
+                "Maven exited " + process.exitValue()
+                        + " without a recognizable code or test failure", started, log);
     }
 
     private static boolean applicationFailure(String output, CheckSpec spec) {

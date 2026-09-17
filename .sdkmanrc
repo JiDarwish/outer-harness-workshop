@@ -1,0 +1,4 @@
+# Run `sdk env` in this directory to switch your shell to Java 25.
+# If this exact identifier is not installed, run `sdk list java | grep installed`
+# and replace the value below with what you have.
+java=25.0.3-tem
