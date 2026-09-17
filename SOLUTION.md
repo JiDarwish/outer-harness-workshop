@@ -26,24 +26,32 @@ rule into a computational sensor.
 
 `bookshelf/src/test/java/workshop/bookshelf/BorrowPolicyTest.java`
 
-The starter already gives you `shelf`, `service` and `aliceId`, and imports both
-`BorrowOutcome` and `assertEquals`. Replace the unasserted borrow and the comments with:
+Replace the **entire test method** with the method below. In particular, remove the
+starter's unasserted `service.borrow(1, aliceId)` call. Keeping it and then pasting the
+assertions underneath would make Alice borrow once during setup and then incorrectly ask
+her to borrow the same copy again.
 
 ```java
-var bobId = 11;
+@Test
+void aSecondMemberCannotBorrowAnAlreadyLoanedBook() {
+    var shelf = BorrowServiceTest.shelf();
+    var service = new BorrowService(shelf);
+    var aliceId = 10;
+    var bobId = 11;
 
-assertEquals(BorrowOutcome.BORROWED, service.borrow(1, aliceId));
-assertEquals(BorrowOutcome.BOOK_UNAVAILABLE, service.borrow(1, bobId));
-assertEquals((long) aliceId, shelf.activeLoan(1).memberId());
+    assertEquals(BorrowOutcome.BORROWED, service.borrow(1, aliceId));
+    assertEquals(BorrowOutcome.BOOK_UNAVAILABLE, service.borrow(1, bobId));
+    assertEquals((long) aliceId, shelf.activeLoan(1).memberId());
 
-assertEquals(BorrowOutcome.RETURNED, service.returnBook(1));
-assertEquals(BorrowOutcome.BORROWED, service.borrow(1, bobId));
-assertEquals((long) bobId, shelf.activeLoan(1).memberId());
+    assertEquals(BorrowOutcome.RETURNED, service.returnBook(1));
+    assertEquals(BorrowOutcome.BORROWED, service.borrow(1, bobId));
+    assertEquals((long) bobId, shelf.activeLoan(1).memberId());
+}
 ```
 
 ```bash
-./mvnw -pl bookshelf test                              # now FAILS on the starter defect
-./mvnw -pl harness test -Dtest=OracleCalibrationTest      # both controls green
+./mvnw -pl bookshelf test                         # now FAILS on the starter defect
+./mvnw -pl harness test -Dtest=OracleCalibrationTest  # both controls green
 ```
 
 If the *good* control fails, read the assertion failure before touching production code.

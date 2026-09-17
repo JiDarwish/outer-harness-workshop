@@ -16,7 +16,6 @@ public final class BorrowService {
         if (!shelf.hasBook(bookId)) return BorrowOutcome.BOOK_NOT_FOUND;
         if (!shelf.hasMember(memberId)) return BorrowOutcome.MEMBER_NOT_FOUND;
 
-        // The agreed second-borrow rule has not been checked here yet.
         shelf.record(new Loan(bookId, memberId));
         return BorrowOutcome.BORROWED;
     }

@@ -73,9 +73,17 @@ reject, one it must accept.
 
 ### Do this
 
-Write the assertions in `BorrowPolicyTest`. You already have `shelf`, `service` and
-`aliceId`. Assert Bob's result and the active borrower while Alice holds the copy, then
-return it, let Bob borrow, and assert both again.
+Write the assertions in `BorrowPolicyTest`. The starter contains this unasserted setup
+call:
+
+```java
+service.borrow(1, aliceId);
+```
+
+**Replace that call** with an assertion that Alice's first borrow succeeds. Do not leave
+the original call above your assertions, or the test will accidentally ask Alice to
+borrow the same copy twice. Then assert Bob's result and the active borrower while Alice
+holds the copy, return it, let Bob borrow, and assert both again.
 
 ```bash
 ./mvnw -pl bookshelf test        # BorrowPolicyTest should now FAIL on the starter defect
@@ -128,12 +136,15 @@ Use `Checks.run(root, spec)` and `Finding.skipped(spec, reason)`.
 **Checkpoint:**
 
 ```
-COMPILE                 PASS
-STATIC_HYGIENE          PASS
-BUSINESS_BEHAVIOR       FAIL
-ARCHITECTURE_BOUNDARY   PASS
-FULL_TEST_SUITE         SKIPPED
-status=UNRESOLVED repairs=0
+PASS      COMPILE
+PASS      STATIC_HYGIENE
+FAIL      BUSINESS_BEHAVIOR
+PASS      ARCHITECTURE_BOUNDARY
+SKIPPED   FULL_TEST_SUITE
+
+=== DECISION ===
+UNRESOLVED
+repairs=0
 ```
 
 It exits 1 on purpose. Check-only invokes no agent and never requests a repair: these

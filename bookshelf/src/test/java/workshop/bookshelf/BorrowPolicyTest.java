@@ -2,9 +2,6 @@ package workshop.bookshelf;
 
 import org.junit.jupiter.api.Test;
 import workshop.bookshelf.service.BorrowService;
-import workshop.bookshelf.domain.BorrowOutcome;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Attendee-owned expectation. Add the agreed result before asking the agent to repair. */
 class BorrowPolicyTest {
