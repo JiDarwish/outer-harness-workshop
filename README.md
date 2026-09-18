@@ -6,9 +6,9 @@ repair budget, and the rule for what counts as a yes.
 
 ## Prerequisites
 
-The core workshop requires **Java 25**. The final live workflow also requires
-the Claude Code CLI to be installed and signed in; everything before that capstone runs
-without a model account.
+The core workshop requires **Java 25**. The final live workflow also requires either
+the Claude Code CLI or the Codex CLI to be installed and signed in; everything before
+that capstone runs without a model account.
 
 ```bash
 java -version          # must report 25
