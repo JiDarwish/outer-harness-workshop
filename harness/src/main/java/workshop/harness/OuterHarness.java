@@ -128,7 +128,7 @@ public final class OuterHarness {
 
     /** The declared order is also the exact final acceptance gate. One list, two jobs. */
     static List<CheckSpec> requiredChecks() {
-        return List.of(Checks.COMPILE, Checks.STATIC_HYGIENE, Checks.BUSINESS_BEHAVIOR,
+        return List.of(Checks.COMPILE, Checks.LINT, Checks.BUSINESS_BEHAVIOR,
                 Checks.ARCHITECTURE_BOUNDARY, Checks.FULL_TEST_SUITE);
     }
 
@@ -137,7 +137,7 @@ public final class OuterHarness {
         //   1. If the invocation produced no candidate, SKIP every required check, with
         //      a reason. Silence is not a pass.
         //   2. Run COMPILE. On FAIL or ERROR, SKIP the dependent checks and return.
-        //   3. Run STATIC_HYGIENE, BUSINESS_BEHAVIOR and ARCHITECTURE_BOUNDARY. They are
+        //   3. Run LINT, BUSINESS_BEHAVIOR and ARCHITECTURE_BOUNDARY. They are
         //      independent: one non-PASS result must not hide the other two.
         //   4. Run FULL_TEST_SUITE only if compilation and all three focused checks passed.
         // Use Checks.run(root, spec) and Finding.skipped(spec, reason).

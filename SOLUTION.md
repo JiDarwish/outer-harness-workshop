@@ -59,7 +59,7 @@ void aSecondMemberCannotBorrowAnAlreadyLoanedBook() {
 
 ```bash
 ./mvnw -pl bookshelf test                         # now FAILS on the starter defect
-./mvnw -pl harness test -Dtest=OracleCalibrationTest  # both controls green
+./mvnw -pl harness test -Dtest=BorrowPolicyControlTest  # both controls green
 ```
 
 If the *good* control fails, read the assertion failure before touching production code.
@@ -100,7 +100,7 @@ if (!compile.passed()) {
 }
 
 var focusedAllPassed = true;
-for (var spec : List.of(Checks.STATIC_HYGIENE, Checks.BUSINESS_BEHAVIOR,
+for (var spec : List.of(Checks.LINT, Checks.BUSINESS_BEHAVIOR,
         Checks.ARCHITECTURE_BOUNDARY)) {
     var finding = Checks.run(root, spec);
     findings.add(finding);
@@ -158,9 +158,9 @@ Note what is *not* here: the full Maven output. `finding.detail()` is already a 
 diagnostic, and that is deliberate. Keep the full logs locally; send the agent a bounded
 summary.
 
-The behaviour suite reads this prompt back and fails scenario 2 unless it contains the
-policy and all three failing check names. Collect only the first failure and you spend
-your whole budget fixing a third of the problem.
+The decision-scenario suite reads this prompt back and fails scenario 2 unless it
+contains the policy and all three failing check names. Collect only the first failure
+and you spend your whole budget fixing a third of the problem.
 
 ---
 
@@ -188,11 +188,12 @@ HARNESS VERIFICATION: STOP — replace the approved-policy placeholder first
 `bookshelf/approved-policy.md` still has the starter questions. Finish section 2.
 
 ```
-HARNESS VERIFICATION: STOP — finish and calibrate BorrowPolicyTest first
+HARNESS VERIFICATION: STOP — finish BorrowPolicyTest and run its control pair first
 ```
 
 Your borrowing check still passes against a known defect. Finish section 3. A loop
-sitting on an uncalibrated oracle cannot be certified, so the suite declines to try.
+cannot be trusted until its business check rejects the bad control and accepts the good
+control, so the suite declines to try.
 
 ---
 
@@ -246,8 +247,8 @@ FINAL DECISION
 
 A live model may finish with zero repairs because it got it right first time, use anything
 up to `MAX_REPAIRS`, or stop without converging. None of those outcomes by itself proves
-your loop right or wrong. The six deterministic scenarios prove its control decisions;
-this live run shows those controls surrounding a real inner harness.
+your loop right or wrong. The six supplied decision scenarios exercise its expected
+control paths; this live run shows those decisions surrounding a real inner harness.
 
 Claude works on an isolated production-only copy, then successful Java changes are copied
 back to `bookshelf/src/main/java` before your sensors run. Open `BorrowService.java` after

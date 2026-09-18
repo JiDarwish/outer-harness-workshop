@@ -9,17 +9,9 @@ import java.util.List;
  * the property a human cares about; {@code -Dtest=BorrowPolicyTest} is merely how it
  * happens to be executed today. A finding reports the first and can reproduce the second.
  */
-record CheckSpec(String name, String property, List<String> command, CheckKind kind) {
-
-    CheckSpec(String name, String property, List<String> command) {
-        this(name, property, command, CheckKind.MAVEN);
-    }
-
+record CheckSpec(String name, String property, List<String> command) {
     /** The exact command a reader can paste to see this result for themselves. */
     String rerun() {
-        return kind == CheckKind.LINT
-                ? "cd bookshelf && java -cp ../harness/target/classes "
-                        + "workshop.harness.StaticHygiene src/main/java"
-                : "cd bookshelf && " + String.join(" ", command);
+        return "cd bookshelf && " + String.join(" ", command);
     }
 }

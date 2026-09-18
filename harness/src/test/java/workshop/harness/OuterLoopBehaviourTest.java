@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Six scenarios your outer loop has to get right.
+ * Six supplied scenarios that challenge your outer-loop decisions.
  *
  * <p>Three of them end ACCEPTED and three end UNRESOLVED, and that balance is the point.
  * A loop that refuses everything passes no test worth passing. These prove yours accepts
@@ -25,10 +25,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 class OuterLoopBehaviourTest {
 
-    // ─── Preconditions. A loop sitting on an uncalibrated oracle cannot be certified. ───
+    // ─── Preconditions. First show that the business check passes its control pair. ───
 
     @BeforeAll
-    static void theOracleMustBeReadyFirst() throws Exception {
+    static void theBusinessCheckMustPassItsControlPair() throws Exception {
         var workspace = Workspace.create();
 
         if (workspace.approvedPolicy().contains("Write the outcome agreed with the librarian")) {
@@ -43,14 +43,14 @@ class OuterLoopBehaviourTest {
         workspace.place(Candidates.missesSecondBorrowRule());
         if (workspace.maven("-B", "-Dtest=BorrowPolicyTest", "test").exitCode() == 0) {
             fail("""
-                    HARNESS VERIFICATION: STOP — finish and calibrate BorrowPolicyTest first.
+                    HARNESS VERIFICATION: STOP — finish BorrowPolicyTest and run its control pair first.
 
                     Your borrowing check still passes against a known defect. Run
-                    OracleCalibrationTest on its own to see both halves of the control pair.""");
+                    BorrowPolicyControlTest on its own to see both halves of the control pair.""");
         }
     }
 
-    // ─── The six behaviours ───
+    // ─── The six decision scenarios ───
 
     @Test
     @DisplayName("Accept a valid first attempt")
@@ -79,7 +79,7 @@ class OuterLoopBehaviourTest {
         assertEquals(1, result.repairs(), "three findings share ONE repair, they do not earn three");
 
         assertEquals("PASS", result.stateOf("build", "COMPILE"));
-        for (var check : new String[] {"STATIC_HYGIENE", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY"}) {
+        for (var check : new String[] {"LINT", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY"}) {
             assertEquals("FAIL", result.stateOf("build", check),
                     check + " must be reported independently: one FAIL cannot hide the others");
         }
@@ -94,7 +94,7 @@ class OuterLoopBehaviourTest {
         var repairPrompt = result.attempts().get(1).prompt();
         assertGuideReachedTheAgent(workspace, repairPrompt,
                 "The repair prompt did not carry the approved policy.");
-        for (var check : new String[] {"STATIC_HYGIENE", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY"}) {
+        for (var check : new String[] {"LINT", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY"}) {
             assertTrue(repairPrompt.contains(check), () -> """
                     The repair prompt left out %s.
 
@@ -188,12 +188,12 @@ class OuterLoopBehaviourTest {
     // ─── helpers ───
 
     private static String[] requiredCheckNames() {
-        return new String[] {"COMPILE", "STATIC_HYGIENE", "BUSINESS_BEHAVIOR",
+        return new String[] {"COMPILE", "LINT", "BUSINESS_BEHAVIOR",
                 "ARCHITECTURE_BOUNDARY", "FULL_TEST_SUITE"};
     }
 
     private static String[] dependentCheckNames() {
-        return new String[] {"STATIC_HYGIENE", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY",
+        return new String[] {"LINT", "BUSINESS_BEHAVIOR", "ARCHITECTURE_BOUNDARY",
                 "FULL_TEST_SUITE"};
     }
 

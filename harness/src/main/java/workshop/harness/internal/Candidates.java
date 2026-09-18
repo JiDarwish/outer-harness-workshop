@@ -21,7 +21,7 @@ public record Candidates(String borrowService, String book) {
         return new Candidates(SERVICE_MISSES_RULE, BOOK_VALID);
     }
 
-    /** Console write, missing borrowing rule, and a domain class reaching into storage. */
+    /** Lint violation, missing borrowing rule, and a domain class reaching into storage. */
     public static Candidates violatesAllThree() {
         return new Candidates(SERVICE_VIOLATES_ALL, BOOK_REACHES_INTO_STORAGE);
     }
@@ -106,7 +106,7 @@ public record Candidates(String borrowService, String book) {
             import workshop.bookshelf.domain.Loan;
             import workshop.bookshelf.storage.InMemoryBookshelf;
 
-            /** Deliberately violates static hygiene and the approved borrowing policy. */
+            /** Deliberately violates lint and the approved borrowing policy. */
             public final class BorrowService {
                 private final InMemoryBookshelf shelf;
 
@@ -115,11 +115,13 @@ public record Candidates(String borrowService, String book) {
                 }
 
                 public BorrowOutcome borrow(long bookId, long memberId) {
-                    System.out.println("borrowing book " + bookId);
                     if (!shelf.hasBook(bookId)) return BorrowOutcome.BOOK_NOT_FOUND;
                     if (!shelf.hasMember(memberId)) return BorrowOutcome.MEMBER_NOT_FOUND;
 
-                    shelf.record(new Loan(bookId, memberId));
+                    try {
+                        shelf.record(new Loan(bookId, memberId));
+                    } catch (RuntimeException failure) {
+                    }
                     return BorrowOutcome.BORROWED;
                 }
 

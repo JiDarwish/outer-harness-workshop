@@ -12,9 +12,9 @@ today is not the code — it is being able to defend every decision the code mak
 Every decision your outer loop will make reads the output of a check. So the first
 question is not "is my code correct" but **"is my check capable of telling me?"**
 
-A suite can run, pass, and be silent about the thing you actually care about. Ma et al.
-recorded 222 behavioural tests passing while the reusable components the task asked for
-were never built. Nothing was broken. The suite measured a property nobody had disputed.
+A suite can run, pass, and still be silent about the thing you actually care about. A
+green build only tells you that the assertions which ran were satisfied. It says nothing
+about a business rule that no assertion expressed.
 
 ### Do this
 
@@ -31,8 +31,6 @@ It passes. Now open two files:
 Alice is holding. And `BorrowPolicyTest` calls `borrow` once and asserts nothing at all.
 
 **Ask what is missing from the test, not how to prompt a model harder.**
-
-> Source: [Ma, Kereopa-Yorke and Schultz, *Building to the Test*](https://arxiv.org/abs/2606.28430)
 
 ---
 
@@ -63,7 +61,7 @@ agreed; conformance is what a check can verify. Only one of those can be automat
 
 ---
 
-## 3. Make the rule executable, and calibrate it
+## 3. Make the rule executable, then check the checker
 
 ### The idea
 
@@ -87,13 +85,14 @@ holds the copy, return it, let Bob borrow, and assert both again.
 
 ```bash
 ./mvnw -pl bookshelf test        # BorrowPolicyTest should now FAIL on the starter defect
-./mvnw -pl harness test -Dtest=OracleCalibrationTest
+./mvnw -pl harness test -Dtest=BorrowPolicyControlTest
 ```
 
-**Checkpoint:** both calibration tests green — your check rejects the known defect and
-accepts a valid implementation. A test that still passes here is not yet a sensor.
+**Checkpoint:** both control tests green — your check rejects the known defect and
+accepts a valid implementation. A test that still passes the bad control is not yet a
+sensor.
 
-This is cheap calibration, not mutation testing. It is no evidence that the business
+This is a cheap control pair, not mutation testing. It is no evidence that the business
 rules are complete, and you should say so out loud.
 
 ---
@@ -147,10 +146,14 @@ spec.name()                             // the name of one required check
 2. Implement `checkSequence`:
    - no candidate from the agent → SKIP every required check, with a reason
    - `COMPILE` first; on FAIL or ERROR, SKIP the dependents and return
-   - `STATIC_HYGIENE`, `BUSINESS_BEHAVIOR`, `ARCHITECTURE_BOUNDARY` independently
+   - `LINT`, `BUSINESS_BEHAVIOR`, `ARCHITECTURE_BOUNDARY` independently
    - `FULL_TEST_SUITE` only if compilation and all three focused checks passed
 
 Use `Checks.run(root, spec)` and `Finding.skipped(spec, reason)`.
+
+`LINT` runs Checkstyle with five deliberately small rules: no unused imports, wildcard
+imports, empty catch blocks, multiple statements on one line, or tab characters. It is a
+cheap mechanical sensor, not evidence that the business behaviour is correct.
 
 ```bash
 ./harness.sh check
@@ -160,7 +163,7 @@ Use `Checks.run(root, spec)` and `Finding.skipped(spec, reason)`.
 
 ```
 PASS      COMPILE
-PASS      STATIC_HYGIENE
+PASS      LINT
 FAIL      BUSINESS_BEHAVIOR
 PASS      ARCHITECTURE_BOUNDARY
 SKIPPED   FULL_TEST_SUITE
@@ -246,7 +249,11 @@ complete set of PASS findings. Never reuse a PASS from before a repair.
 ./mvnw -pl harness test
 ```
 
-**Checkpoint:** all six behaviours green.
+The supplied tests use deterministic agents and disposable Bookshelf copies. They
+challenge the decisions you implemented without requiring a live model: when to accept,
+when to repair, and when to stop without accepting.
+
+**Checkpoint:** all six supplied decision scenarios pass.
 
 | | Scenario | Ends |
 |---|---|---|
@@ -260,8 +267,9 @@ complete set of PASS findings. Never reuse a PASS from before a repair.
 Three accept and three refuse, and that balance is the point. A loop that refuses
 everything passes no test worth passing.
 
-The suite will not start until your policy placeholder is gone and your oracle is
-calibrated. It declines to certify a loop whose oracle has never been challenged.
+The suite will not start until your policy placeholder is gone and your business check
+has passed the control pair. It declines to certify a loop whose business check has never
+been shown to reject the known defect and accept the valid implementation.
 
 ---
 
@@ -301,9 +309,9 @@ each provider's strongest model so the surrounding guidance and feedback have a 
 to become visible.
 
 A live model may use anything from zero repairs up to `MAX_REPAIRS` — it may simply get it
-right first time. Do not force a failure just to show the retry. The six deterministic
-scenarios are what prove every control path; the live run is the eye test that connects
-those controls to an actual inner harness.
+right first time. Do not force a failure just to show the retry. The six supplied
+decision scenarios exercise the expected control paths; the live run is the eye test
+that connects those decisions to an actual inner harness.
 
 ---
 

@@ -21,9 +21,9 @@ final class Checks {
     static final CheckSpec COMPILE = new CheckSpec("COMPILE",
             "production Java sources compile",
             List.of(MAVEN, "-B", "compile"));
-    static final CheckSpec STATIC_HYGIENE = new CheckSpec("STATIC_HYGIENE",
-            "production library code does not write directly to the console",
-            List.of(), CheckKind.LINT);
+    static final CheckSpec LINT = new CheckSpec("LINT",
+            "production Java satisfies the supplied lint rules",
+            List.of(MAVEN, "-B", "checkstyle:check"));
     static final CheckSpec BUSINESS_BEHAVIOR = new CheckSpec("BUSINESS_BEHAVIOR",
             "the approved borrowing policy",
             List.of(MAVEN, "-B", "-Dtest=BorrowPolicyTest", "test"));
@@ -44,30 +44,13 @@ final class Checks {
             var reports = bookshelf.resolve("target/harness-reports");
             Files.createDirectories(reports);
             log = Files.createTempFile(reports, spec.name().toLowerCase() + "-", ".log");
-            return spec.kind() == CheckKind.LINT
-                    ? lint(spec, bookshelf, started, log)
-                    : maven(spec, bookshelf, started, log);
+            return maven(spec, bookshelf, started, log);
         } catch (IOException e) {
             return result(spec, State.ERROR, "Could not run/read check: " + e.getMessage(),
                     started, log);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return result(spec, State.ERROR, "Check command interrupted", started, log);
-        }
-    }
-
-    /** The static sensor is a library call, not a subprocess: same verdict, no process spawn. */
-    private static Finding lint(CheckSpec spec, Path bookshelf, long started, Path log) {
-        try {
-            var inspection = StaticHygiene.inspect(bookshelf.resolve("src/main/java"));
-            Files.writeString(log, inspection.output());
-            return inspection.clean()
-                    ? result(spec, State.PASS, "", started, log)
-                    : result(spec, State.FAIL, diagnostic(inspection.output(), spec),
-                            started, log);
-        } catch (Exception e) {
-            return result(spec, State.ERROR,
-                    "Static sensor could not produce a verdict: " + e.getMessage(), started, log);
         }
     }
 
@@ -94,7 +77,7 @@ final class Checks {
     }
 
     private static boolean applicationFailure(String output, CheckSpec spec) {
-        if (spec.kind() == CheckKind.LINT) return output.contains("[LINT]");
+        if (spec == LINT) return output.contains("Checkstyle violation");
         return output.contains("There are test failures")
                 || output.contains("COMPILATION ERROR")
                 || output.lines().anyMatch(line -> line.contains("[ERROR] Tests run:")
@@ -103,9 +86,12 @@ final class Checks {
     }
 
     private static String diagnostic(String output, CheckSpec spec) {
-        if (spec.kind() == CheckKind.LINT) {
-            return String.join("\n", output.lines().filter(line -> line.startsWith("[LINT]"))
-                    .limit(6).map(Checks::shortLine).toList());
+        if (spec == LINT) {
+            var violations = output.lines().map(String::strip)
+                    .filter(line -> line.contains(".java:["))
+                    .map(Checks::withoutMavenPrefix)
+                    .distinct().limit(4).map(Checks::shortLine).toList();
+            if (!violations.isEmpty()) return String.join("\n", violations);
         }
         var useful = output.lines().map(String::strip)
                 .filter(line -> line.startsWith("[ERROR]   ")
