@@ -9,17 +9,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * Calibrates YOUR borrowing check before anything downstream is allowed to trust it.
+ * Checks YOUR borrowing check before anything downstream is allowed to trust it.
  *
  * <p>This is the pair: one implementation your test must reject, one it must accept.
  * It challenges the test, not the code. A green suite that asserts nothing passes both
  * halves of nothing — and every decision the outer loop makes afterwards reads the
  * output of a check like this one.
  *
- * <p>It is cheap calibration, not mutation testing, and it is no evidence that the
+ * <p>It is a cheap control pair, not mutation testing, and it is no evidence that the
  * business rules are complete.
  */
-class OracleCalibrationTest {
+class BorrowPolicyControlTest {
 
     @Test
     @DisplayName("Your borrowing check rejects an implementation that misses the rule")

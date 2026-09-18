@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>Nothing here ever touches your working tree. Every scenario gets its own temporary
  * directory, and the copy includes YOUR BorrowPolicyTest — the loop is only as good as
- * the oracle you gave it.
+ * the business check you gave it.
  */
 final class Workspace {
 
