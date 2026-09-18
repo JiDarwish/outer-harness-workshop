@@ -17,8 +17,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Six supplied scenarios that challenge your outer-loop decisions.
  *
  * <p>Three of them end ACCEPTED and three end UNRESOLVED, and that balance is the point.
- * A loop that refuses everything passes no test worth passing. These prove yours accepts
- * correctly AND refuses correctly.
+ * A loop that refuses everything passes no test worth passing. These scenarios check
+ * that yours accepts correctly AND refuses correctly.
  *
  * <p>Every scenario runs against a disposable copy. Your working tree is never touched,
  * and no live model is used.

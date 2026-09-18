@@ -162,15 +162,17 @@ cheap mechanical sensor, not evidence that the business behaviour is correct.
 **Checkpoint:**
 
 ```
+━━ SENSORS ON CURRENT SOURCE ━━
 PASS      COMPILE
 PASS      LINT
 FAIL      BUSINESS_BEHAVIOR
 PASS      ARCHITECTURE_BOUNDARY
 SKIPPED   FULL_TEST_SUITE
 
-=== DECISION ===
+━━ FINAL DECISION ━━
 UNRESOLVED
-repairs=0
+Attempts: 1
+Repairs: disabled in check-only mode
 ```
 
 It exits 1 on purpose. Check-only invokes no agent and never requests a repair: these
@@ -223,7 +225,9 @@ maximum, not a target.
 
 Three failures do not earn three repairs. They share this prompt.
 
-There is nothing to run here: check-only never repairs, by design. The proof comes next.
+There is no separate runtime checkpoint here because check-only never invokes an agent.
+Lab 3 completes the decision rule, then the supplied scenarios validate the repair
+decision, repair prompt, fresh rechecking, and final acceptance together.
 
 > Source: [Gao, Yang and Yang, *Looping Is Not Reliability*](https://arxiv.org/abs/2607.24604)
 
