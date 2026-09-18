@@ -76,7 +76,7 @@ public final class OuterHarness {
 
         // LAB 1 — see GUIDE.md section 4. Guide before action: the approved rule has to
         // reach the agent BEFORE it writes anything. Right now it does not.
-        var prompt = task;
+        var prompt = task + policy;
         reporter.guidesBeforeAction(prompt, policy);
 
         var started = System.nanoTime();
@@ -141,14 +141,51 @@ public final class OuterHarness {
         //      independent: one non-PASS result must not hide the other two.
         //   4. Run FULL_TEST_SUITE only if compilation and all three focused checks passed.
         // Use Checks.run(root, spec) and Finding.skipped(spec, reason).
-        return List.of(Finding.notWired());
+        var findings = new ArrayList<Finding>();
+        if (agent.failed()) {
+            for (var spec : requiredChecks()) {
+                findings.add(Finding.skipped(spec, "the agent produced no candidate to check"));
+            }
+            return List.copyOf(findings);
+        }
+
+        var compile = Checks.run(root, Checks.COMPILE);
+        findings.add(compile);
+        if (!compile.passed()) {
+            for (var spec : requiredChecks()) {
+                if (spec.name().equals(Checks.COMPILE.name())) continue;
+                findings.add(Finding.skipped(spec,
+                        "compilation did not pass, so this cannot produce a verdict"));
+            }
+            return List.copyOf(findings);
+        }
+
+        var focusedAllPassed = true;
+        for (var spec : List.of(Checks.LINT, Checks.BUSINESS_BEHAVIOR,
+                Checks.ARCHITECTURE_BOUNDARY)) {
+            var finding = Checks.run(root, spec);
+            findings.add(finding);
+            if (!finding.passed()) focusedAllPassed = false;
+        }
+
+        findings.add(focusedAllPassed
+                ? Checks.run(root, Checks.FULL_TEST_SUITE)
+                : Finding.skipped(Checks.FULL_TEST_SUITE,
+                "a focused check did not pass, so the broad suite adds nothing yet"));
+        return List.copyOf(findings);
     }
 
     static boolean needsRepair(AttemptReport report) {
         // LAB 2 — see GUIDE.md section 5. Repair application FAIL findings only.
         // An agent failure, a check ERROR, or UNCHECKED evidence means there is no
         // trustworthy application defect to repair against.
-        return false;
+        if (report.agent().failed()) return false;
+        var anyApplicationFailure = false;
+        for (var finding : report.findings()) {
+            if (finding.error() || finding.unchecked()) return false;
+            if (finding.failed()) anyApplicationFailure = true;
+        }
+        return anyApplicationFailure;
     }
 
     static String repairPrompt(String task, String policy, AttemptReport report) {
@@ -157,14 +194,29 @@ public final class OuterHarness {
         // meant to hold, one short diagnostic line, and the exact command to reproduce it.
         // Tell the agent to preserve the checks that passed. Three failures do not earn
         // three repairs; they share this prompt.
-        return task;
+        var prompt = new StringBuilder(task)
+                .append("\n\nApproved policy:\n").append(policy)
+                .append("\n\nEvery check below failed on the code you just wrote. ")
+                .append("Fix all of them in one pass. Preserve the checks that already passed.\n");
+        for (var finding : report.findings()) {
+            if (!finding.failed()) continue;
+            prompt.append("\n- check: ").append(finding.name())
+                    .append("\n  intended property: ").append(finding.property())
+                    .append("\n  detail: ").append(finding.detail())
+                    .append("\n  reproduce with: ").append(finding.rerun()).append('\n');
+        }
+        return prompt.toString();
     }
 
     static boolean accepted(List<AttemptReport> reports) {
         // LAB 3 — see GUIDE.md section 6. Inspect the FINAL attempt only. It must come
         // from a successful agent call and carry a complete set of PASS findings.
         // A PASS from before a repair cannot stand in for a missing result after it.
-        return false;
+        if (reports.isEmpty()) return false;
+        var last = reports.getLast();
+        if (last.agent().failed()) return false;
+        var passed = last.findings().stream().filter(Finding::passed).map(Finding::name).toList();
+        return requiredChecks().stream().allMatch(spec -> passed.contains(spec.name()));
     }
 
     private static String taskDescription() throws IOException {

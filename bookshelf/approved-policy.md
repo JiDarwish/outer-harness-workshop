@@ -1,5 +1,5 @@
 # Approved borrowing policy
 
-Write the outcome agreed with the librarian here before running the agent. In particular:
-what should happen when Alice has borrowed Book 1 and Bob asks for Book 1? What should
-happen after Alice returns it?
+One physical copy can have at most one active loan.
+While Alice holds Book 1, Bob receives BOOK_UNAVAILABLE and Alice remains the active borrower.
+After Alice returns Book 1, Bob may borrow it and becomes the active borrower.
